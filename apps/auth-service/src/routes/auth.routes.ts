@@ -3,13 +3,30 @@ import { z } from "zod";
 
 import { createLoginLog } from "../repositories/login-log.repository.js";
 import { findUserByEmail, updateLastLogin } from "../repositories/user.repository.js";
-import { signAccessToken } from "../utils/jwt.js";
+import { findSessionUserById } from "../repositories/user-session.repository.js";
+import { signAccessToken, verifyAccessToken } from "../utils/jwt.js";
 import { verifyPassword } from "../utils/password.js";
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1)
 });
+
+function getBearerToken(request: FastifyRequest): string | null {
+  const authorization = request.headers.authorization;
+
+  if (!authorization) {
+    return null;
+  }
+
+  const [scheme, token] = authorization.split(" ");
+
+  if (scheme !== "Bearer" || !token) {
+    return null;
+  }
+
+  return token;
+}
 
 export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/login", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -102,5 +119,41 @@ export async function authRoutes(app: FastifyInstance) {
         status: user.status
       }
     });
+  });
+
+  app.get("/auth/me", async (request: FastifyRequest, reply: FastifyReply) => {
+    const token = getBearerToken(request);
+
+    if (!token) {
+      return reply.status(401).send({
+        message: "Missing or invalid authorization token"
+      });
+    }
+
+    try {
+      const payload = verifyAccessToken(token);
+      const user = await findSessionUserById(payload.userId);
+
+      if (!user || user.status !== "ACTIVE") {
+        return reply.status(401).send({
+          message: "User session is no longer valid"
+        });
+      }
+
+      return reply.send({
+        user: {
+          id: user.id,
+          churchId: user.church_id,
+          fullName: user.full_name,
+          email: user.email,
+          role: user.role,
+          status: user.status
+        }
+      });
+    } catch {
+      return reply.status(401).send({
+        message: "Invalid or expired token"
+      });
+    }
   });
 }
