@@ -2,14 +2,21 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import { createLoginLog } from "../repositories/login-log.repository.js";
-import { findUserByEmail, updateLastLogin } from "../repositories/user.repository.js";
+import { createUser, findUserByEmail, updateLastLogin } from "../repositories/user.repository.js";
 import { findSessionUserById } from "../repositories/user-session.repository.js";
 import { signAccessToken, verifyAccessToken } from "../utils/jwt.js";
-import { verifyPassword } from "../utils/password.js";
+import { hashPassword, verifyPassword } from "../utils/password.js";
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1)
+});
+
+const createUserSchema = z.object({
+  fullName: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(8),
+  role: z.enum(["ADMIN", "USER"]).default("USER")
 });
 
 function getBearerToken(request: FastifyRequest): string | null {
@@ -26,6 +33,23 @@ function getBearerToken(request: FastifyRequest): string | null {
   }
 
   return token;
+}
+
+async function getActiveSessionUser(request: FastifyRequest) {
+  const token = getBearerToken(request);
+
+  if (!token) {
+    return null;
+  }
+
+  const payload = verifyAccessToken(token);
+  const user = await findSessionUserById(payload.userId);
+
+  if (!user || user.status !== "ACTIVE") {
+    return null;
+  }
+
+  return user;
 }
 
 export async function authRoutes(app: FastifyInstance) {
@@ -122,21 +146,12 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   app.get("/auth/me", async (request: FastifyRequest, reply: FastifyReply) => {
-    const token = getBearerToken(request);
-
-    if (!token) {
-      return reply.status(401).send({
-        message: "Missing or invalid authorization token"
-      });
-    }
-
     try {
-      const payload = verifyAccessToken(token);
-      const user = await findSessionUserById(payload.userId);
+      const user = await getActiveSessionUser(request);
 
-      if (!user || user.status !== "ACTIVE") {
+      if (!user) {
         return reply.status(401).send({
-          message: "User session is no longer valid"
+          message: "Invalid or expired token"
         });
       }
 
@@ -155,5 +170,69 @@ export async function authRoutes(app: FastifyInstance) {
         message: "Invalid or expired token"
       });
     }
+  });
+
+  app.post("/auth/users", async (request: FastifyRequest, reply: FastifyReply) => {
+    let currentUser;
+
+    try {
+      currentUser = await getActiveSessionUser(request);
+    } catch {
+      return reply.status(401).send({
+        message: "Invalid or expired token"
+      });
+    }
+
+    if (!currentUser) {
+      return reply.status(401).send({
+        message: "Authentication required"
+      });
+    }
+
+    if (currentUser.role !== "ADMIN") {
+      return reply.status(403).send({
+        message: "Admin access required"
+      });
+    }
+
+    const parsed = createUserSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      return reply.status(400).send({
+        message: "Invalid user creation request",
+        errors: parsed.error.flatten().fieldErrors
+      });
+    }
+
+    const existingUser = await findUserByEmail(parsed.data.email);
+
+    if (existingUser) {
+      return reply.status(409).send({
+        message: "A user with this email already exists"
+      });
+    }
+
+    const passwordHash = await hashPassword(parsed.data.password);
+
+    const newUser = await createUser({
+      churchId: currentUser.church_id,
+      fullName: parsed.data.fullName,
+      email: parsed.data.email,
+      passwordHash,
+      role: parsed.data.role
+    });
+
+    return reply.status(201).send({
+      message: "User created successfully",
+      user: {
+        id: newUser.id,
+        churchId: newUser.church_id,
+        fullName: newUser.full_name,
+        email: newUser.email,
+        role: newUser.role,
+        status: newUser.status,
+        createdAt: newUser.created_at
+      }
+    });
   });
 }
