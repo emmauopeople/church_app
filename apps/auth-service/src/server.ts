@@ -1,9 +1,11 @@
+import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
-import dotenv from "dotenv";
 
-dotenv.config();
+import { db } from "./config/db.js";
+
+
 
 const app = Fastify({
   logger: true
@@ -25,6 +27,17 @@ async function start() {
       service: "auth-service",
       status: "ok",
       timestamp: new Date().toISOString()
+    };
+  });
+
+  app.get("/health/db", async () => {
+    const result = await db.query("SELECT NOW() as now");
+
+    return {
+      service: "auth-service",
+      database: "auth_db",
+      status: "ok",
+      time: result.rows[0].now
     };
   });
 
