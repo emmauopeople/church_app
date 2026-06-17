@@ -1,0 +1,16 @@
+{
+  "name": "church-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Church Management and Sacrament System - Microservices Application",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "echo \"Run individual services during initial development\"",
+    "lint": "echo \"Lint will be configured after services are created\"",
+    "test": "echo \"Tests will be configured after services are created\"",
+    "build": "echo \"Build will be configured after services are created\""
+  }
+}
