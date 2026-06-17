@@ -20,3 +20,7 @@ export function signAccessToken(payload: JwtUserPayload): string {
 
   return jwt.sign(payload, JWT_SECRET as Secret, options);
 }
+
+export function verifyAccessToken(token: string): JwtUserPayload {
+  return jwt.verify(token, JWT_SECRET as Secret) as JwtUserPayload;
+}
