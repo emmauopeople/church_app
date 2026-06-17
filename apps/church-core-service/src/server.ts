@@ -4,6 +4,7 @@ import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 
 import { db } from "./config/db.js";
+import { memberRoutes } from "./routes/member.routes.js";
 
 const app = Fastify({
   logger: true
@@ -38,6 +39,8 @@ async function start() {
       time: result.rows[0].now
     };
   });
+
+  await app.register(memberRoutes);
 
   try {
     await app.listen({ port: PORT, host: HOST });
