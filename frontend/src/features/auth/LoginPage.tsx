@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, LockKeyhole, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -7,15 +7,39 @@ import { ChurchEmblem } from '../../components/decorative/ChurchEmblem';
 import { CurvedLoginDivider } from '../../components/decorative/CurvedLoginDivider';
 import { OrnamentDivider } from '../../components/decorative/OrnamentDivider';
 import { LanguageSwitcher } from '../../components/ui/LanguageSwitcher';
+import { login } from './auth.api';
+import { saveAuthSession } from './auth.storage';
 
 export function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-  event.preventDefault();
-  navigate('/app/dashboard');
-};
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setErrorMessage('');
+
+    const formData = new FormData(event.currentTarget);
+    const email = String(formData.get('email') ?? '').trim();
+    const password = String(formData.get('password') ?? '');
+
+    if (!email || !password) {
+      setErrorMessage('Veuillez saisir votre email et votre mot de passe.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const response = await login({ email, password });
+      saveAuthSession(response.accessToken, response.user);
+      navigate('/app/dashboard');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Connexion impossible. Veuillez reessayer.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#FFF9EE] text-[#1F2933]">
@@ -98,25 +122,35 @@ const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
               <label className="group flex h-16 items-center gap-4 rounded-xl border border-[#D9CFB8] bg-white/85 px-5 shadow-[0_8px_24px_rgba(31,41,51,0.08)] transition focus-within:border-[#D4AF37] focus-within:ring-4 focus-within:ring-[#D4AF37]/15">
                 <UserRound className="h-6 w-6 shrink-0 text-[#145C43]" aria-hidden="true" />
                 <input
-                  type="text"
+                  name="email"
+                  type="email"
                   className="h-full flex-1 bg-transparent text-lg text-[#1F2933] outline-none placeholder:text-[#7B8188]"
                   placeholder={t('login.email')}
                   autoComplete="username"
+                  disabled={isSubmitting}
                 />
               </label>
 
               <label className="group flex h-16 items-center gap-4 rounded-xl border border-[#D9CFB8] bg-white/85 px-5 shadow-[0_8px_24px_rgba(31,41,51,0.08)] transition focus-within:border-[#D4AF37] focus-within:ring-4 focus-within:ring-[#D4AF37]/15">
                 <LockKeyhole className="h-6 w-6 shrink-0 text-[#145C43]" aria-hidden="true" />
                 <input
+                  name="password"
                   type="password"
                   className="h-full flex-1 bg-transparent text-lg text-[#1F2933] outline-none placeholder:text-[#7B8188]"
                   placeholder={t('login.password')}
                   autoComplete="current-password"
+                  disabled={isSubmitting}
                 />
                 <button type="button" className="text-[#7B8188] transition hover:text-[#145C43]" aria-label="Afficher ou masquer le mot de passe">
                   <Eye className="h-6 w-6" aria-hidden="true" />
                 </button>
               </label>
+
+              {errorMessage && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                  {errorMessage}
+                </div>
+              )}
 
               <div className="flex justify-start">
                 <button type="button" className="text-base font-medium text-[#0F3D2E] underline underline-offset-4 transition hover:text-[#145C43]">
@@ -126,10 +160,11 @@ const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
 
               <button
                 type="submit"
-                className="flex h-16 w-full items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-[#0F3D2E] to-[#146046] text-xl font-bold text-white shadow-[0_14px_30px_rgba(15,61,46,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(15,61,46,0.32)] focus:outline-none focus:ring-4 focus:ring-[#D4AF37]/30"
+                disabled={isSubmitting}
+                className="flex h-16 w-full items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-[#0F3D2E] to-[#146046] text-xl font-bold text-white shadow-[0_14px_30px_rgba(15,61,46,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(15,61,46,0.32)] focus:outline-none focus:ring-4 focus:ring-[#D4AF37]/30 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 <LockKeyhole className="h-6 w-6" aria-hidden="true" />
-                {t('login.submit')}
+                {isSubmitting ? 'Connexion...' : t('login.submit')}
               </button>
             </form>
 
