@@ -21,11 +21,19 @@ export function MembersPage() {
 
     return mockMembers.filter((member) => {
       const fullName = `${member.firstName} ${member.lastName}`.toLowerCase();
-      return (
-        fullName.includes(search) ||
-        member.phone.toLowerCase().includes(search) ||
-        member.id.toLowerCase().includes(search)
-      );
+      const searchable = [
+        fullName,
+        member.memberCode,
+        member.phone,
+        member.email,
+        member.city,
+        member.address,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return searchable.includes(search);
     });
   }, [searchTerm]);
 
@@ -63,7 +71,7 @@ export function MembersPage() {
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Rechercher par nom, telephone ou reference"
+                placeholder="Rechercher par nom, code, telephone, email ou ville"
                 className="h-full flex-1 bg-transparent outline-none placeholder:text-[#98A2B3]"
               />
             </label>
