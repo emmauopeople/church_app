@@ -6,13 +6,12 @@ import { TopBar } from './TopBar';
 
 export function AppShell() {
   return (
-    <div className="min-h-screen bg-[#EFE7D6] text-[#1F2933]">
+    <div className="flex h-dvh flex-col bg-[#EFE7D6] text-[#1F2933]">
       <TopBar />
       <Ribbon />
-
-      <div className="flex min-h-[calc(100vh-10rem)]">
+      <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="flex-1 overflow-auto p-4 lg:p-6">
+        <main className="min-h-0 flex-1 overflow-auto p-4 lg:p-6">
           <Outlet />
         </main>
       </div>
