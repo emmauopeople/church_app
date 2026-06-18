@@ -78,7 +78,9 @@ export function MembersPage() {
           />
         </div>
 
-        <MemberProfileCard member={selectedMember} />
+        <div className="xl:sticky xl:top-0 xl:max-h-[calc(100dvh-12rem)] xl:overflow-auto">
+          <MemberProfileCard member={selectedMember} />
+        </div>
       </section>
     </div>
   );
