@@ -24,12 +24,16 @@ const createMemberSchema = z.object({
   lastName: z.string().min(1),
   middleName: z.string().optional().nullable(),
   dateOfBirth: z.string().optional().nullable(),
+  birthPlace: z.string().optional().nullable(),
   gender: z.enum(["MALE", "FEMALE"]).optional().nullable(),
   phone: z.string().optional().nullable(),
   email: z.string().email().optional().nullable(),
   address: z.string().optional().nullable(),
   city: z.string().optional().nullable(),
-  country: z.string().optional().nullable()
+  country: z.string().optional().nullable(),
+  fatherName: z.string().optional().nullable(),
+  motherName: z.string().optional().nullable(),
+  maritalStatus: z.enum(["SINGLE", "MARRIED", "WIDOWED", "DIVORCED"]).optional().nullable()
 });
 
 const updateMemberSchema = createMemberSchema.extend({
@@ -45,12 +49,16 @@ function formatMember(member: any) {
     lastName: member.last_name,
     middleName: member.middle_name,
     dateOfBirth: member.date_of_birth,
+    birthPlace: member.birth_place,
     gender: member.gender,
     phone: member.phone,
     email: member.email,
     address: member.address,
     city: member.city,
     country: member.country,
+    fatherName: member.father_name,
+    motherName: member.mother_name,
+    maritalStatus: member.marital_status,
     status: member.status,
     createdBy: member.created_by,
     createdAt: member.created_at,
@@ -160,7 +168,7 @@ export async function memberRoutes(app: FastifyInstance) {
     }
   });
 
-    app.put("/core/members/:id", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.put("/core/members/:id", async (request: FastifyRequest, reply: FastifyReply) => {
     const authUser = requireAuth(request, reply);
 
     if (!authUser) return;
