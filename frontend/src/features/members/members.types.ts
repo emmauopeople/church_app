@@ -1,21 +1,31 @@
-export type Gender = 'male' | 'female';
+export type Gender = 'MALE' | 'FEMALE';
 
-export type MaritalStatus = 'single' | 'married' | 'widowed' | 'divorced';
+export type MemberStatus = 'ACTIVE' | 'INACTIVE' | 'DECEASED';
+
+export type MaritalStatus = 'SINGLE' | 'MARRIED' | 'WIDOWED' | 'DIVORCED';
 
 export type Member = {
   id: string;
-  lastName: string;
+  churchId?: string;
+  memberCode: string;
   firstName: string;
-  birthDate: string;
-  birthPlace: string;
-  gender: Gender;
-  phone: string;
-  address: string;
-  fatherName: string;
-  motherName: string;
-  maritalStatus: MaritalStatus;
-  registrationDate: string;
-  notes?: string;
+  lastName: string;
+  middleName?: string | null;
+  dateOfBirth?: string | null;
+  birthPlace?: string | null;
+  gender?: Gender | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  city?: string | null;
+  country?: string | null;
+  fatherName?: string | null;
+  motherName?: string | null;
+  maritalStatus?: MaritalStatus | null;
+  status: MemberStatus;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
-export type MemberFormValues = Omit<Member, 'id' | 'registrationDate'>;
+export type MemberFormValues = Omit<Member, 'id' | 'churchId' | 'createdBy' | 'createdAt' | 'updatedAt'>;
