@@ -1,4 +1,4 @@
-import { Eye, LockKeyhole, Mail, UserRound } from 'lucide-react';
+import { Eye, LockKeyhole, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { ChurchEmblem } from '../../components/decorative/ChurchEmblem';
