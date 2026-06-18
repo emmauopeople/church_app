@@ -1,3 +1,5 @@
+import type { FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Eye, LockKeyhole, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -8,6 +10,12 @@ import { LanguageSwitcher } from '../../components/ui/LanguageSwitcher';
 
 export function LoginPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+
+const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  event.preventDefault();
+  navigate('/app/dashboard');
+};
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#FFF9EE] text-[#1F2933]">
@@ -86,7 +94,7 @@ export function LoginPage() {
               </div>
             </div>
 
-            <form className="space-y-5" onSubmit={(event) => event.preventDefault()}>
+            <form className="space-y-5" onSubmit={handleSubmit}>
               <label className="group flex h-16 items-center gap-4 rounded-xl border border-[#D9CFB8] bg-white/85 px-5 shadow-[0_8px_24px_rgba(31,41,51,0.08)] transition focus-within:border-[#D4AF37] focus-within:ring-4 focus-within:ring-[#D4AF37]/15">
                 <UserRound className="h-6 w-6 shrink-0 text-[#145C43]" aria-hidden="true" />
                 <input
