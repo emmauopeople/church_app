@@ -9,8 +9,14 @@ type MemberListProps = {
 };
 
 const genderLabels = {
-  male: 'Masculin',
-  female: 'Feminin',
+  MALE: 'Masculin',
+  FEMALE: 'Feminin',
+};
+
+const statusLabels = {
+  ACTIVE: 'Actif',
+  INACTIVE: 'Inactif',
+  DECEASED: 'Decede',
 };
 
 const pageSize = 10;
@@ -44,14 +50,15 @@ export function MemberList({ members, selectedMemberId, onSelectMember }: Member
       </div>
 
       <div className="max-h-[520px] overflow-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[820px] text-left text-sm">
           <thead className="sticky top-0 z-10 bg-[#F8F3E7] text-xs uppercase tracking-wide text-[#667085]">
             <tr>
               <th className="px-5 py-3">Nom</th>
+              <th className="px-5 py-3">Code</th>
               <th className="px-5 py-3">Telephone</th>
               <th className="px-5 py-3">Sexe</th>
-              <th className="px-5 py-3">Adresse</th>
-              <th className="px-5 py-3">Reference</th>
+              <th className="px-5 py-3">Ville</th>
+              <th className="px-5 py-3">Statut</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEE6D6]">
@@ -68,17 +75,22 @@ export function MemberList({ members, selectedMemberId, onSelectMember }: Member
                     <p className="font-bold text-[#1F2933]">{member.lastName}</p>
                     <p className="text-[#667085]">{member.firstName}</p>
                   </td>
-                  <td className="px-5 py-4 text-[#344054]">{member.phone}</td>
-                  <td className="px-5 py-4 text-[#344054]">{genderLabels[member.gender]}</td>
-                  <td className="px-5 py-4 text-[#344054]">{member.address}</td>
-                  <td className="px-5 py-4 font-semibold text-[#0F3D2E]">{member.id}</td>
+                  <td className="px-5 py-4 font-semibold text-[#0F3D2E]">{member.memberCode}</td>
+                  <td className="px-5 py-4 text-[#344054]">{member.phone ?? '-'}</td>
+                  <td className="px-5 py-4 text-[#344054]">{member.gender ? genderLabels[member.gender] : '-'}</td>
+                  <td className="px-5 py-4 text-[#344054]">{member.city ?? '-'}</td>
+                  <td className="px-5 py-4">
+                    <span className="rounded-full bg-[#E7F5EF] px-3 py-1 text-xs font-bold text-[#0F3D2E]">
+                      {statusLabels[member.status]}
+                    </span>
+                  </td>
                 </tr>
               );
             })}
 
             {visibleMembers.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-[#667085]">
+                <td colSpan={6} className="px-5 py-10 text-center text-[#667085]">
                   Aucun paroissien trouve.
                 </td>
               </tr>
@@ -89,7 +101,7 @@ export function MemberList({ members, selectedMemberId, onSelectMember }: Member
 
       <div className="flex flex-col gap-3 border-t border-[#E5DED0] bg-[#FFF9EE] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-semibold text-[#667085]">
-          Page {page} sur {totalPages} • {pageSize} lignes par page
+          Page {page} sur {totalPages} - {pageSize} lignes par page
         </p>
         <div className="flex gap-3">
           <button
