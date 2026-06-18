@@ -5,6 +5,7 @@ import helmet from "@fastify/helmet";
 
 import { db } from "./config/db.js";
 import { memberRoutes } from "./routes/member.routes.js";
+import { sacramentTypeRoutes } from "./routes/sacrament-type.routes.js";
 
 const app = Fastify({
   logger: true
@@ -41,6 +42,7 @@ async function start() {
   });
 
   await app.register(memberRoutes);
+  await app.register(sacramentTypeRoutes);
 
   try {
     await app.listen({ port: PORT, host: HOST });
