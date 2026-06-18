@@ -1,15 +1,44 @@
 {
   "login": {
-    "appTitleLine1": "Système de Gestion",
+    "appTitleLine1": "Systeme de Gestion",
     "appTitleLine2": "Paroissiale",
-    "diocese": "Diocèse de Ouagadougou, Burkina Faso",
-    "description": "Gérez les paroissiens, les sacrements et les documents paroissiaux.",
-    "secureAccess": "Accès sécurisé du personnel paroissial",
+    "diocese": "Diocese de Ouagadougou, Burkina Faso",
+    "description": "Gerez les paroissiens, les sacrements et les documents paroissiaux.",
+    "secureAccess": "Acces securise du personnel paroissial",
     "email": "E-mail ou nom d'utilisateur",
     "password": "Mot de passe",
-    "forgotPassword": "Mot de passe oublié ?",
+    "forgotPassword": "Mot de passe oublie ?",
     "submit": "Connexion",
     "language": "Langue",
-    "footer": "© 2028 Diocèse catholique de Ouagadougou | Support : admin@diocese.bf"
+    "footer": "© 2028 Diocese catholique de Ouagadougou | Support : admin@diocese.bf"
+  },
+  "app": {
+    "title": "Gestion Paroissiale",
+    "subtitle": "Bureau paroissial numerique",
+    "staffName": "Secretariat",
+    "staffRole": "Personnel paroissial"
+  },
+  "nav": {
+    "workspace": "Espace de travail",
+    "workspaceDescription": "Gestion des paroissiens, registres et certificats.",
+    "dashboard": "Tableau de bord",
+    "members": "Paroissiens",
+    "sacraments": "Sacrements",
+    "certificates": "Certificats",
+    "registers": "Registres",
+    "documents": "Documents",
+    "settings": "Parametres"
+  },
+  "ribbon": {
+    "newMember": "Nouveau paroissien",
+    "search": "Rechercher",
+    "save": "Enregistrer",
+    "print": "Imprimer",
+    "newBaptism": "Nouvel acte",
+    "newMarriage": "Nouveau mariage",
+    "confirmation": "Confirmation",
+    "createCertificate": "Creer certificat",
+    "preview": "Apercu",
+    "exportPdf": "Exporter PDF"
   }
 }
