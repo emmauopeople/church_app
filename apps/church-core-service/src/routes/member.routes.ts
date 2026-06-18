@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import { requireAuth } from "../middlewares/auth.js";
+import { createMember } from "../repositories/member-create.repository.js";
 import { findMemberByIdForChurch } from "../repositories/member-detail.repository.js";
 import { listMembersByChurch } from "../repositories/member.repository.js";
 
@@ -14,6 +15,20 @@ const listMembersQuerySchema = z.object({
 
 const memberParamsSchema = z.object({
   id: z.string().uuid()
+});
+
+const createMemberSchema = z.object({
+  memberCode: z.string().min(2),
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  middleName: z.string().optional().nullable(),
+  dateOfBirth: z.string().optional().nullable(),
+  gender: z.enum(["MALE", "FEMALE"]).optional().nullable(),
+  phone: z.string().optional().nullable(),
+  email: z.string().email().optional().nullable(),
+  address: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
+  country: z.string().optional().nullable()
 });
 
 function formatMember(member: any) {
@@ -42,9 +57,7 @@ export async function memberRoutes(app: FastifyInstance) {
   app.get("/core/members", async (request: FastifyRequest, reply: FastifyReply) => {
     const authUser = requireAuth(request, reply);
 
-    if (!authUser) {
-      return;
-    }
+    if (!authUser) return;
 
     const parsed = listMembersQuerySchema.safeParse(request.query);
 
@@ -79,9 +92,7 @@ export async function memberRoutes(app: FastifyInstance) {
   app.get("/core/members/:id", async (request: FastifyRequest, reply: FastifyReply) => {
     const authUser = requireAuth(request, reply);
 
-    if (!authUser) {
-      return;
-    }
+    if (!authUser) return;
 
     const parsed = memberParamsSchema.safeParse(request.params);
 
@@ -106,5 +117,41 @@ export async function memberRoutes(app: FastifyInstance) {
     return reply.send({
       data: formatMember(member)
     });
+  });
+
+  app.post("/core/members", async (request: FastifyRequest, reply: FastifyReply) => {
+    const authUser = requireAuth(request, reply);
+
+    if (!authUser) return;
+
+    const parsed = createMemberSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      return reply.status(400).send({
+        message: "Invalid member creation request",
+        errors: parsed.error.flatten().fieldErrors
+      });
+    }
+
+    try {
+      const member = await createMember({
+        churchId: authUser.churchId,
+        createdBy: authUser.userId,
+        ...parsed.data
+      });
+
+      return reply.status(201).send({
+        message: "Member created successfully",
+        data: formatMember(member)
+      });
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return reply.status(409).send({
+          message: "A member with this member code already exists"
+        });
+      }
+
+      throw error;
+    }
   });
 }
