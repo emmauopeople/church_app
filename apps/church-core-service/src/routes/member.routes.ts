@@ -5,6 +5,7 @@ import { requireAuth } from "../middlewares/auth.js";
 import { createMember } from "../repositories/member-create.repository.js";
 import { findMemberByIdForChurch } from "../repositories/member-detail.repository.js";
 import { listMembersByChurch } from "../repositories/member.repository.js";
+import { updateMemberForChurch } from "../repositories/member-update.repository.js";
 
 const listMembersQuerySchema = z.object({
   search: z.string().optional(),
@@ -29,6 +30,10 @@ const createMemberSchema = z.object({
   address: z.string().optional().nullable(),
   city: z.string().optional().nullable(),
   country: z.string().optional().nullable()
+});
+
+const updateMemberSchema = createMemberSchema.extend({
+  status: z.enum(["ACTIVE", "INACTIVE", "DECEASED"]).default("ACTIVE")
 });
 
 function formatMember(member: any) {
@@ -142,6 +147,57 @@ export async function memberRoutes(app: FastifyInstance) {
 
       return reply.status(201).send({
         message: "Member created successfully",
+        data: formatMember(member)
+      });
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return reply.status(409).send({
+          message: "A member with this member code already exists"
+        });
+      }
+
+      throw error;
+    }
+  });
+
+    app.put("/core/members/:id", async (request: FastifyRequest, reply: FastifyReply) => {
+    const authUser = requireAuth(request, reply);
+
+    if (!authUser) return;
+
+    const paramsParsed = memberParamsSchema.safeParse(request.params);
+
+    if (!paramsParsed.success) {
+      return reply.status(400).send({
+        message: "Invalid member id",
+        errors: paramsParsed.error.flatten().fieldErrors
+      });
+    }
+
+    const bodyParsed = updateMemberSchema.safeParse(request.body);
+
+    if (!bodyParsed.success) {
+      return reply.status(400).send({
+        message: "Invalid member update request",
+        errors: bodyParsed.error.flatten().fieldErrors
+      });
+    }
+
+    try {
+      const member = await updateMemberForChurch({
+        memberId: paramsParsed.data.id,
+        churchId: authUser.churchId,
+        ...bodyParsed.data
+      });
+
+      if (!member) {
+        return reply.status(404).send({
+          message: "Member not found"
+        });
+      }
+
+      return reply.send({
+        message: "Member updated successfully",
         data: formatMember(member)
       });
     } catch (error: any) {
