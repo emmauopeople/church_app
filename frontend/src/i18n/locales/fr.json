@@ -1,0 +1,15 @@
+{
+  "login": {
+    "appTitleLine1": "Système de Gestion",
+    "appTitleLine2": "Paroissiale",
+    "diocese": "Diocèse de Ouagadougou, Burkina Faso",
+    "description": "Gérez les paroissiens, les sacrements et les documents paroissiaux.",
+    "secureAccess": "Accès sécurisé du personnel paroissial",
+    "email": "E-mail ou nom d'utilisateur",
+    "password": "Mot de passe",
+    "forgotPassword": "Mot de passe oublié ?",
+    "submit": "Connexion",
+    "language": "Langue",
+    "footer": "© 2028 Diocèse catholique de Ouagadougou | Support : admin@diocese.bf"
+  }
+}
