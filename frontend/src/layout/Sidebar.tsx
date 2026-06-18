@@ -24,7 +24,7 @@ export function Sidebar() {
   const { t } = useTranslation();
 
   return (
-    <aside className="hidden w-72 shrink-0 border-r border-[#D8C8A2] bg-[#FFF9EE] lg:block">
+    <aside className="hidden h-full w-72 shrink-0 overflow-auto border-r border-[#D8C8A2] bg-[#FFF9EE] lg:block">
       <div className="border-b border-[#E5DED0] px-5 py-5">
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#9D7A1E]">
           {t('nav.workspace')}
