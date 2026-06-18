@@ -69,7 +69,7 @@ export function MembersPage() {
             </label>
           </div>
 
-          {showForm && <MemberForm />}
+          {showForm && <MemberForm onCancel={() => setShowForm(false)} />}
 
           <MemberList
             members={filteredMembers}
