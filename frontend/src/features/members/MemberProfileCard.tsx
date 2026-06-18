@@ -6,13 +6,19 @@ type MemberProfileCardProps = {
 };
 
 const maritalStatusLabels = {
-  single: 'Celibataire',
-  married: 'Marie(e)',
-  widowed: 'Veuf / Veuve',
-  divorced: 'Divorce(e)',
+  SINGLE: 'Celibataire',
+  MARRIED: 'Marie(e)',
+  WIDOWED: 'Veuf / Veuve',
+  DIVORCED: 'Divorce(e)',
 };
 
-function FieldRow({ label, value }: { label: string; value: string }) {
+const statusLabels = {
+  ACTIVE: 'Actif',
+  INACTIVE: 'Inactif',
+  DECEASED: 'Decede',
+};
+
+function FieldRow({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="border-b border-[#EEE6D6] py-3 last:border-b-0">
       <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">{label}</p>
@@ -43,24 +49,22 @@ export function MemberProfileCard({ member }: MemberProfileCardProps) {
         <h3 className="mt-4 font-serif text-2xl font-bold text-[#0F3D2E]">
           {member.firstName} {member.lastName}
         </h3>
-        <p className="mt-1 text-sm font-semibold text-[#9D7A1E]">{member.id}</p>
+        <p className="mt-1 text-sm font-semibold text-[#9D7A1E]">{member.memberCode}</p>
       </div>
 
       <div className="mt-6 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] px-4">
-        <FieldRow label="Date de naissance" value={member.birthDate} />
+        <FieldRow label="Statut" value={statusLabels[member.status]} />
+        <FieldRow label="Date de naissance" value={member.dateOfBirth} />
         <FieldRow label="Lieu de naissance" value={member.birthPlace} />
         <FieldRow label="Telephone" value={member.phone} />
+        <FieldRow label="Email" value={member.email} />
         <FieldRow label="Adresse" value={member.address} />
+        <FieldRow label="Ville" value={member.city} />
+        <FieldRow label="Pays" value={member.country} />
         <FieldRow label="Pere" value={member.fatherName} />
         <FieldRow label="Mere" value={member.motherName} />
-        <FieldRow label="Statut matrimonial" value={maritalStatusLabels[member.maritalStatus]} />
+        <FieldRow label="Statut matrimonial" value={member.maritalStatus ? maritalStatusLabels[member.maritalStatus] : '-'} />
       </div>
-
-      {member.notes && (
-        <div className="mt-5 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] p-4 text-sm text-[#667085]">
-          {member.notes}
-        </div>
-      )}
     </aside>
   );
 }
