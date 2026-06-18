@@ -1,3 +1,4 @@
+import { getAccessToken } from '../auth/auth.storage';
 import { config } from '../../lib/config';
 import type { Member, MemberFormValues, MemberStatus } from './members.types';
 
@@ -28,10 +29,6 @@ type CreateMemberResponse = MemberResponse & {
 type UpdateMemberResponse = MemberResponse & {
   message: string;
 };
-
-function getAccessToken() {
-  return localStorage.getItem('church_app_access_token');
-}
 
 function buildHeaders() {
   const token = getAccessToken();
