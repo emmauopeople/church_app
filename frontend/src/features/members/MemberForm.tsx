@@ -1,8 +1,15 @@
 import { CatholicIcon } from '../../components/decorative/CatholicIcon';
 
-export function MemberForm() {
+type MemberFormProps = {
+  onCancel: () => void;
+};
+
+export function MemberForm({ onCancel }: MemberFormProps) {
   return (
-    <form className="rounded-2xl border border-[#E5DED0] bg-white p-6 shadow-sm">
+    <form
+      className="rounded-2xl border border-[#E5DED0] bg-white p-6 shadow-sm"
+      onSubmit={(event) => event.preventDefault()}
+    >
       <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#F4E8C8] text-[#0F3D2E]">
           <CatholicIcon name="plus" className="h-6 w-6" />
@@ -40,11 +47,14 @@ export function MemberForm() {
         </label>
       </div>
 
-      <div className="mt-6 flex justify-end gap-3">
-        <button type="button" className="rounded-xl border border-[#D8C8A2] px-5 py-3 font-semibold text-[#0F3D2E]">
+      <div className="mt-6 flex flex-wrap justify-end gap-3">
+        <button type="reset" className="rounded-xl border border-[#D8C8A2] px-5 py-3 font-semibold text-[#0F3D2E] hover:bg-[#FFF9EE]">
+          Effacer
+        </button>
+        <button type="button" onClick={onCancel} className="rounded-xl border border-[#D8C8A2] px-5 py-3 font-semibold text-[#0F3D2E] hover:bg-[#FFF9EE]">
           Annuler
         </button>
-        <button type="submit" className="rounded-xl bg-[#0F3D2E] px-5 py-3 font-semibold text-white">
+        <button type="submit" className="rounded-xl bg-[#0F3D2E] px-5 py-3 font-semibold text-white hover:bg-[#145C43]">
           Enregistrer
         </button>
       </div>
