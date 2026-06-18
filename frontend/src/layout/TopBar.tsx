@@ -1,10 +1,34 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 import { ChurchEmblem } from '../components/decorative/ChurchEmblem';
 import { LanguageSwitcher } from '../components/ui/LanguageSwitcher';
+import { clearAuthSession, getStoredUser } from '../features/auth/auth.storage';
 
 export function TopBar() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const user = getStoredUser();
+
+  const initials = useMemo(() => {
+    if (!user?.fullName) {
+      return 'SP';
+    }
+
+    return user.fullName
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase();
+  }, [user?.fullName]);
+
+  const handleLogout = () => {
+    clearAuthSession();
+    navigate('/login');
+  };
 
   return (
     <header className="flex min-h-16 items-center justify-between border-b border-[#D8C8A2] bg-[#0F3D2E] px-4 text-white shadow-md lg:px-6">
@@ -26,13 +50,20 @@ export function TopBar() {
         </div>
         <div className="flex items-center gap-3 rounded-full border border-[#D4AF37]/40 bg-white/10 px-3 py-1.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F4E8C8] text-sm font-bold text-[#0F3D2E]">
-            SP
+            {initials}
           </div>
           <div className="hidden text-sm leading-tight sm:block">
-            <p className="font-semibold">{t('app.staffName')}</p>
-            <p className="text-xs text-[#EBDFAF]">{t('app.staffRole')}</p>
+            <p className="font-semibold">{user?.fullName ?? t('app.staffName')}</p>
+            <p className="text-xs text-[#EBDFAF]">{user?.role ?? t('app.staffRole')}</p>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="hidden rounded-lg border border-[#D4AF37]/40 px-3 py-2 text-sm font-semibold text-[#FFF7DD] transition hover:bg-white/10 md:inline-flex"
+        >
+          Deconnexion
+        </button>
       </div>
     </header>
   );
