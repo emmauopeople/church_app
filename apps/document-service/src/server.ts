@@ -1,0 +1,56 @@
+import "dotenv/config";
+import Fastify from "fastify";
+import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+
+import { db } from "./config/db.js";
+import { certificateRoutes } from "./routes/certificate.routes.js";
+
+const app = Fastify({
+  logger: true
+});
+
+const PORT = Number(process.env.PORT || 4003);
+const HOST = "0.0.0.0";
+
+async function start() {
+  await app.register(cors, {
+    origin: true,
+    credentials: true
+  });
+
+  await app.register(helmet, {
+    contentSecurityPolicy: false
+  });
+
+  app.get("/health", async () => {
+    return {
+      service: "document-service",
+      status: "ok",
+      timestamp: new Date().toISOString()
+    };
+  });
+
+  app.get("/health/db", async () => {
+    const result = await db.query("SELECT NOW() as now");
+
+    return {
+      service: "document-service",
+      database: "document_core_db",
+      status: "ok",
+      time: result.rows[0].now
+    };
+  });
+
+  await app.register(certificateRoutes);
+
+  try {
+    await app.listen({ port: PORT, host: HOST });
+    app.log.info(`Document service running on port ${PORT}`);
+  } catch (error) {
+    app.log.error(error);
+    process.exit(1);
+  }
+}
+
+start();

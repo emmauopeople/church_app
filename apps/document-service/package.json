@@ -1,0 +1,30 @@
+{
+  "name": "document-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Document and certificate generation service",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "lint": "echo \"lint will be added later\"",
+    "test": "echo \"tests will be added later\""
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@fastify/helmet": "^12.0.1",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.13.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
