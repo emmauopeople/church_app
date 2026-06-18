@@ -8,12 +8,16 @@ export type MemberDetail = {
   last_name: string;
   middle_name: string | null;
   date_of_birth: string | null;
+  birth_place: string | null;
   gender: "MALE" | "FEMALE" | null;
   phone: string | null;
   email: string | null;
   address: string | null;
   city: string | null;
   country: string | null;
+  father_name: string | null;
+  mother_name: string | null;
+  marital_status: "SINGLE" | "MARRIED" | "WIDOWED" | "DIVORCED" | null;
   status: "ACTIVE" | "INACTIVE" | "DECEASED";
   created_by: string;
   created_at: Date;
@@ -34,12 +38,16 @@ export async function findMemberByIdForChurch(params: {
         last_name,
         middle_name,
         date_of_birth,
+        birth_place,
         gender,
         phone,
         email,
         address,
         city,
         country,
+        father_name,
+        mother_name,
+        marital_status,
         status,
         created_by,
         created_at,
