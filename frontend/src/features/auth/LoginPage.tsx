@@ -131,7 +131,7 @@ export function LoginPage() {
 
             <LanguageSwitcher />
 
-            <p className="mt-16 text-center text-sm text-[#4B5563]">
+            <p className="mt-24 text-center text-sm text-[#4B5563] lg:mt-32">
               {t('login.footer')}
             </p>
           </div>
