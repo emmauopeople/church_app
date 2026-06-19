@@ -32,6 +32,12 @@ type UpdateMemberResponse = MemberResponse & {
   message: string;
 };
 
+type NextMemberCodeResponse = {
+  data: {
+    memberCode: string;
+  };
+};
+
 function buildHeaders() {
   const token = getAccessToken();
 
@@ -68,6 +74,14 @@ export async function listMembers(params: ListMembersParams = {}) {
   });
 
   return parseResponse<ListMembersResponse>(response);
+}
+
+export async function getNextMemberCode() {
+  const response = await fetch(`${config.churchCoreApiUrl}/core/members/next-code`, {
+    headers: buildHeaders(),
+  });
+
+  return parseResponse<NextMemberCodeResponse>(response);
 }
 
 export async function getMember(memberId: string) {
