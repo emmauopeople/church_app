@@ -38,6 +38,16 @@ function findRequestedType(types: SacramentType[], requestedType: string | null)
   });
 }
 
+function isConfirmationType(type?: SacramentType) {
+  if (!type) {
+    return false;
+  }
+
+  const code = type.code.toLowerCase();
+  const name = type.name.toLowerCase();
+  return code.includes('confirm') || name.includes('confirm');
+}
+
 function formatDate(value: string) {
   return value ? value.slice(0, 10) : '-';
 }
@@ -52,10 +62,15 @@ export function SacramentsPage() {
   const [sacramentTypes, setSacramentTypes] = useState<SacramentType[]>([]);
   const [sacraments, setSacraments] = useState<Sacrament[]>([]);
   const [selectedTypeId, setSelectedTypeId] = useState('');
+  const [sponsor1Name, setSponsor1Name] = useState('');
+  const [sponsor2Name, setSponsor2Name] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  const selectedSacramentType = sacramentTypes.find((type) => String(type.id) === selectedTypeId);
+  const selectedIsConfirmation = isConfirmationType(selectedSacramentType);
 
   useEffect(() => {
     async function loadSacramentPage() {
@@ -85,6 +100,16 @@ export function SacramentsPage() {
     loadSacramentPage();
   }, [queryMemberId, queryType]);
 
+  useEffect(() => {
+    if (selectedIsConfirmation) {
+      setSponsor1Name((current) => current || 'N/A');
+      setSponsor2Name((current) => current || 'N/A');
+    } else if (sponsor1Name === 'N/A' && sponsor2Name === 'N/A') {
+      setSponsor1Name('');
+      setSponsor2Name('');
+    }
+  }, [selectedIsConfirmation, sponsor1Name, sponsor2Name]);
+
   const reloadSacraments = async () => {
     const response = await listSacraments({ memberId: queryMemberId || undefined, page: 1, limit: 20 });
     setSacraments(response.data);
@@ -102,9 +127,21 @@ export function SacramentsPage() {
     const sacramentTypeId = Number(getText(formData, 'sacramentTypeId'));
     const certificateNumber = getText(formData, 'certificateNumber');
     const sacramentDate = getText(formData, 'sacramentDate');
+    const sponsor1 = getText(formData, 'sponsor1Name');
+    const sponsor2 = getText(formData, 'sponsor2Name');
 
     if (!sacramentTypeId || !certificateNumber || !sacramentDate) {
       setErrorMessage('Le type de sacrement, le numero de certificat et la date sont obligatoires.');
+      return;
+    }
+
+    if (!sponsor1 || !sponsor2) {
+      setErrorMessage('Sponsor 1 et Sponsor 2 sont obligatoires. Pour la confirmation, utilisez N/A si non applicable.');
+      return;
+    }
+
+    if (!selectedIsConfirmation && (sponsor1.toLowerCase() === 'n/a' || sponsor2.toLowerCase() === 'n/a')) {
+      setErrorMessage('Pour ce sacrement, les noms des sponsors doivent etre renseignes. N/A est reserve a la confirmation.');
       return;
     }
 
@@ -120,11 +157,15 @@ export function SacramentsPage() {
         sacramentDate,
         place: getNullableText(formData, 'place'),
         officiant: getNullableText(formData, 'officiant'),
+        sponsor1Name: sponsor1,
+        sponsor2Name: sponsor2,
         notes: getNullableText(formData, 'notes'),
       });
 
       event.currentTarget.reset();
       setSelectedTypeId(String(sacramentTypeId));
+      setSponsor1Name(selectedIsConfirmation ? 'N/A' : '');
+      setSponsor2Name(selectedIsConfirmation ? 'N/A' : '');
       await reloadSacraments();
       setSuccessMessage('Acte de sacrement enregistre avec succes.');
     } catch (error) {
@@ -212,6 +253,30 @@ export function SacramentsPage() {
               <span className={labelTextClass}>Celebrant / Officiant</span>
               <input name="officiant" className={inputClass} disabled={isSaving} />
             </label>
+            <label className={labelClass}>
+              <span className={labelTextClass}>Sponsor 1 / Parrain</span>
+              <input
+                name="sponsor1Name"
+                className={inputClass}
+                value={sponsor1Name}
+                onChange={(event) => setSponsor1Name(event.target.value)}
+                placeholder={selectedIsConfirmation ? 'N/A' : 'Nom du sponsor 1'}
+                disabled={isSaving}
+                required
+              />
+            </label>
+            <label className={labelClass}>
+              <span className={labelTextClass}>Sponsor 2 / Marraine</span>
+              <input
+                name="sponsor2Name"
+                className={inputClass}
+                value={sponsor2Name}
+                onChange={(event) => setSponsor2Name(event.target.value)}
+                placeholder={selectedIsConfirmation ? 'N/A' : 'Nom du sponsor 2'}
+                disabled={isSaving}
+                required
+              />
+            </label>
             <label className={`${labelClass} md:col-span-2`}>
               <span className={labelTextClass}>Notes</span>
               <textarea
@@ -221,6 +286,10 @@ export function SacramentsPage() {
               />
             </label>
           </div>
+
+          <p className="mt-4 text-xs font-semibold text-[#667085]">
+            Sponsor 1 et Sponsor 2 sont obligatoires. Pour la confirmation, vous pouvez utiliser N/A si non applicable.
+          </p>
 
           <div className="mt-6 flex justify-end">
             <button
@@ -248,6 +317,9 @@ export function SacramentsPage() {
                 </p>
                 <p className="mt-1 text-xs font-semibold text-[#667085]">
                   Certificat: {sacrament.certificateNumber} - Date: {formatDate(sacrament.sacramentDate)}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-[#667085]">
+                  Sponsor 1: {sacrament.sponsor1Name || '-'} - Sponsor 2: {sacrament.sponsor2Name || '-'}
                 </p>
               </div>
             ))}
