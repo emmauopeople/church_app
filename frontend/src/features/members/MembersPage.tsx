@@ -1,41 +1,73 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { CatholicIcon } from '../../components/decorative/CatholicIcon';
 import { MemberForm } from './MemberForm';
 import { MemberList } from './MemberList';
 import { MemberProfileCard } from './MemberProfileCard';
-import { mockMembers } from './members.mock';
+import { listMembers } from './members.api';
 import type { Member } from './members.types';
+
+const pageSize = 10;
 
 export function MembersPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMember, setSelectedMember] = useState<Member | null>(mockMembers[0] ?? null);
+  const [page, setPage] = useState(1);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [pagination, setPagination] = useState({
+    total: 0,
+    totalPages: 1,
+  });
 
-  const filteredMembers = useMemo(() => {
-    const search = searchTerm.trim().toLowerCase();
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      async function loadMembers() {
+        try {
+          setIsLoading(true);
+          setErrorMessage('');
 
-    if (!search) {
-      return mockMembers;
-    }
+          const response = await listMembers({
+            search: searchTerm.trim() || undefined,
+            page,
+            limit: pageSize,
+          });
 
-    return mockMembers.filter((member) => {
-      const fullName = `${member.firstName} ${member.lastName}`.toLowerCase();
-      const searchable = [
-        fullName,
-        member.memberCode,
-        member.phone,
-        member.email,
-        member.city,
-        member.address,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
+          setMembers(response.data);
+          setPagination({
+            total: response.pagination.total,
+            totalPages: response.pagination.totalPages,
+          });
 
-      return searchable.includes(search);
-    });
-  }, [searchTerm]);
+          setSelectedMember((current) => {
+            if (current && response.data.some((member) => member.id === current.id)) {
+              return current;
+            }
+
+            return response.data[0] ?? null;
+          });
+        } catch (error) {
+          setErrorMessage(error instanceof Error ? error.message : 'Impossible de charger les paroissiens.');
+          setMembers([]);
+          setSelectedMember(null);
+          setPagination({ total: 0, totalPages: 1 });
+        } finally {
+          setIsLoading(false);
+        }
+      }
+
+      loadMembers();
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [page, searchTerm]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setPage(1);
+  };
 
   return (
     <div className="space-y-6">
@@ -70,18 +102,30 @@ export function MembersPage() {
               <CatholicIcon name="search" className="h-5 w-5 text-[#9D7A1E]" />
               <input
                 value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
+                onChange={(event) => handleSearchChange(event.target.value)}
                 placeholder="Rechercher par nom, code, telephone, email ou ville"
                 className="h-full flex-1 bg-transparent outline-none placeholder:text-[#98A2B3]"
               />
             </label>
           </div>
 
+          {errorMessage && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+              {errorMessage}
+            </div>
+          )}
+
           {showForm && <MemberForm onCancel={() => setShowForm(false)} />}
 
           <MemberList
-            members={filteredMembers}
+            members={members}
             selectedMemberId={selectedMember?.id ?? ''}
+            page={page}
+            pageSize={pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            isLoading={isLoading}
+            onPageChange={setPage}
             onSelectMember={setSelectedMember}
           />
         </div>
