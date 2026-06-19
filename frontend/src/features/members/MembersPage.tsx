@@ -4,10 +4,33 @@ import { CatholicIcon } from '../../components/decorative/CatholicIcon';
 import { MemberForm } from './MemberForm';
 import { MemberList } from './MemberList';
 import { MemberProfileCard } from './MemberProfileCard';
-import { createMember, listMembers } from './members.api';
+import { createMember, listMembers, updateMember } from './members.api';
 import type { Member, MemberFormValues } from './members.types';
 
 const pageSize = 10;
+
+type FormMode = 'create' | 'edit';
+
+function memberToFormValues(member: Member): MemberFormValues {
+  return {
+    memberCode: member.memberCode,
+    firstName: member.firstName,
+    lastName: member.lastName,
+    middleName: member.middleName ?? null,
+    dateOfBirth: member.dateOfBirth ?? null,
+    birthPlace: member.birthPlace ?? null,
+    gender: member.gender ?? null,
+    phone: member.phone ?? null,
+    email: member.email ?? null,
+    address: member.address ?? null,
+    city: member.city ?? null,
+    country: member.country ?? null,
+    fatherName: member.fatherName ?? null,
+    motherName: member.motherName ?? null,
+    maritalStatus: member.maritalStatus ?? null,
+    status: member.status,
+  };
+}
 
 export function MembersPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,7 +38,8 @@ export function MembersPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [formMode, setFormMode] = useState<FormMode | null>(null);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -72,6 +96,29 @@ export function MembersPage() {
     setPage(1);
   };
 
+  const openCreateForm = () => {
+    setFormMode('create');
+    setEditingMember(null);
+    setErrorMessage('');
+    setSuccessMessage('');
+  };
+
+  const openEditForm = () => {
+    if (!selectedMember) {
+      return;
+    }
+
+    setFormMode('edit');
+    setEditingMember(selectedMember);
+    setErrorMessage('');
+    setSuccessMessage('');
+  };
+
+  const closeForm = () => {
+    setFormMode(null);
+    setEditingMember(null);
+  };
+
   const handleCreateMember = async (values: MemberFormValues) => {
     try {
       setIsSaving(true);
@@ -81,7 +128,7 @@ export function MembersPage() {
       const response = await createMember(values);
 
       setSelectedMember(response.data);
-      setShowForm(false);
+      closeForm();
       setSearchTerm('');
       setPage(1);
       setRefreshKey((current) => current + 1);
@@ -92,6 +139,31 @@ export function MembersPage() {
       setIsSaving(false);
     }
   };
+
+  const handleUpdateMember = async (values: MemberFormValues) => {
+    if (!editingMember) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setErrorMessage('');
+      setSuccessMessage('');
+
+      const response = await updateMember(editingMember.id, values);
+
+      setSelectedMember(response.data);
+      closeForm();
+      setRefreshKey((current) => current + 1);
+      setSuccessMessage('Fiche paroissien mise a jour avec succes.');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Impossible de modifier le paroissien.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const formInitialValues = editingMember ? memberToFormValues(editingMember) : undefined;
 
   return (
     <div className="space-y-6">
@@ -110,7 +182,7 @@ export function MembersPage() {
 
           <button
             type="button"
-            onClick={() => setShowForm((current) => !current)}
+            onClick={openCreateForm}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0F3D2E] px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-[#145C43]"
           >
             <CatholicIcon name="plus" className="h-5 w-5" />
@@ -145,11 +217,14 @@ export function MembersPage() {
             </div>
           )}
 
-          {showForm && (
+          {formMode && (
             <MemberForm
+              key={`${formMode}-${editingMember?.id ?? 'new'}`}
+              mode={formMode}
+              initialValues={formInitialValues}
               isSubmitting={isSaving}
-              onCancel={() => setShowForm(false)}
-              onSubmit={handleCreateMember}
+              onCancel={closeForm}
+              onSubmit={formMode === 'edit' ? handleUpdateMember : handleCreateMember}
             />
           )}
 
@@ -167,7 +242,7 @@ export function MembersPage() {
         </div>
 
         <div className="xl:sticky xl:top-0 xl:max-h-[calc(100dvh-12rem)] xl:overflow-auto">
-          <MemberProfileCard member={selectedMember} />
+          <MemberProfileCard member={selectedMember} onEdit={openEditForm} />
         </div>
       </section>
     </div>
