@@ -3,6 +3,7 @@ import type { Member } from './members.types';
 
 type MemberProfileCardProps = {
   member: Member | null;
+  onEdit?: () => void;
 };
 
 const maritalStatusLabels = {
@@ -27,7 +28,7 @@ function FieldRow({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
-export function MemberProfileCard({ member }: MemberProfileCardProps) {
+export function MemberProfileCard({ member, onEdit }: MemberProfileCardProps) {
   if (!member) {
     return (
       <aside className="rounded-2xl border border-[#E5DED0] bg-white p-6 shadow-sm">
@@ -50,6 +51,15 @@ export function MemberProfileCard({ member }: MemberProfileCardProps) {
           {member.firstName} {member.lastName}
         </h3>
         <p className="mt-1 text-sm font-semibold text-[#9D7A1E]">{member.memberCode}</p>
+
+        <button
+          type="button"
+          onClick={onEdit}
+          className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#FFF9EE]"
+        >
+          <CatholicIcon name="save" className="h-4 w-4" />
+          Modifier
+        </button>
       </div>
 
       <div className="mt-6 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] px-4">
