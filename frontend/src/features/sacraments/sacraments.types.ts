@@ -17,6 +17,8 @@ export type Sacrament = {
   sacramentDate: string;
   place?: string | null;
   officiant?: string | null;
+  sponsor1Name?: string | null;
+  sponsor2Name?: string | null;
   notes?: string | null;
   createdBy?: string;
   createdAt?: string;
@@ -30,5 +32,7 @@ export type CreateSacramentPayload = {
   sacramentDate: string;
   place?: string | null;
   officiant?: string | null;
+  sponsor1Name: string;
+  sponsor2Name: string;
   notes?: string | null;
 };
