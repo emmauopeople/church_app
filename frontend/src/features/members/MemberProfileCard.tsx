@@ -48,6 +48,10 @@ export function MemberProfileCard({
     );
   }
 
+  const secondaryStatusAction = member.status === 'ACTIVE'
+    ? { label: 'Desactiver', status: 'INACTIVE' as MemberStatus }
+    : { label: 'Reactiver', status: 'ACTIVE' as MemberStatus };
+
   return (
     <aside className="rounded-2xl border border-[#E5DED0] bg-white p-6 shadow-sm">
       <div className="text-center">
@@ -57,49 +61,32 @@ export function MemberProfileCard({
         <h3 className="mt-4 font-serif text-2xl font-bold text-[#0F3D2E]">
           {member.firstName} {member.lastName}
         </h3>
-        <p className="mt-1 text-sm font-semibold text-[#9D7A1E]">{member.memberCode}</p>
+      </div>
 
+      <div className="mt-5 grid grid-cols-3 gap-2">
         <button
           type="button"
           onClick={onEdit}
-          className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#FFF9EE]"
+          className="rounded-xl border border-[#D8C8A2] bg-white px-2 py-2 text-xs font-bold text-[#0F3D2E] transition hover:bg-[#FFF9EE] sm:text-sm"
         >
-          <CatholicIcon name="save" className="h-4 w-4" />
           Modifier
         </button>
-      </div>
-
-      <div className="mt-5 grid gap-2">
-        {member.status !== 'ACTIVE' && (
-          <button
-            type="button"
-            disabled={isUpdatingStatus}
-            onClick={() => onSetStatus?.('ACTIVE')}
-            className="rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-2 text-sm font-bold text-[#0F3D2E] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Reactiver
-          </button>
-        )}
-        {member.status === 'ACTIVE' && (
-          <button
-            type="button"
-            disabled={isUpdatingStatus}
-            onClick={() => onSetStatus?.('INACTIVE')}
-            className="rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-2 text-sm font-bold text-[#0F3D2E] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Desactiver
-          </button>
-        )}
-        {member.status !== 'DECEASED' && (
-          <button
-            type="button"
-            disabled={isUpdatingStatus}
-            onClick={() => onSetStatus?.('DECEASED')}
-            className="rounded-xl border border-[#E7C7C7] bg-[#FFF5F5] px-4 py-2 text-sm font-bold text-[#8A1F1F] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Marquer decede
-          </button>
-        )}
+        <button
+          type="button"
+          disabled={isUpdatingStatus}
+          onClick={() => onSetStatus?.(secondaryStatusAction.status)}
+          className="rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-2 py-2 text-xs font-bold text-[#0F3D2E] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+        >
+          {secondaryStatusAction.label}
+        </button>
+        <button
+          type="button"
+          disabled={isUpdatingStatus || member.status === 'DECEASED'}
+          onClick={() => onSetStatus?.('DECEASED')}
+          className="rounded-xl border border-[#E7C7C7] bg-[#FFF5F5] px-2 py-2 text-xs font-bold text-[#8A1F1F] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+        >
+          Decede
+        </button>
       </div>
 
       <div className="mt-6 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] px-4">
