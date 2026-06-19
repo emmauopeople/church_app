@@ -10,6 +10,8 @@ export type CreatedSacrament = {
   sacrament_date: string;
   place: string | null;
   officiant: string | null;
+  sponsor1_name: string | null;
+  sponsor2_name: string | null;
   notes: string | null;
   created_by: string;
   created_at: Date;
@@ -24,6 +26,8 @@ export async function createSacrament(params: {
   sacramentDate: string;
   place?: string | null;
   officiant?: string | null;
+  sponsor1Name?: string | null;
+  sponsor2Name?: string | null;
   notes?: string | null;
   createdBy: string;
 }): Promise<CreatedSacrament | null> {
@@ -37,6 +41,8 @@ export async function createSacrament(params: {
         sacrament_date,
         place,
         officiant,
+        sponsor1_name,
+        sponsor2_name,
         notes,
         created_by
       )
@@ -49,7 +55,9 @@ export async function createSacrament(params: {
         $6,
         $7,
         $8,
-        $9
+        $9,
+        $10,
+        $11
       FROM members m
       WHERE m.id = $2
         AND m.church_id = $1
@@ -67,6 +75,8 @@ export async function createSacrament(params: {
         sacrament_date,
         place,
         officiant,
+        sponsor1_name,
+        sponsor2_name,
         notes,
         created_by,
         created_at,
@@ -80,6 +90,8 @@ export async function createSacrament(params: {
       params.sacramentDate,
       params.place ?? null,
       params.officiant ?? null,
+      params.sponsor1Name ?? null,
+      params.sponsor2Name ?? null,
       params.notes ?? null,
       params.createdBy
     ]
