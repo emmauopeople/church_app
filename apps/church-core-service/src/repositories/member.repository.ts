@@ -22,13 +22,17 @@ export type MemberListItem = {
   created_at: Date;
 };
 
+type CountResult = {
+  total: string;
+};
+
 export async function listMembersByChurch(params: {
   churchId: string;
   search?: string;
   status?: "ACTIVE" | "INACTIVE" | "DECEASED";
   limit: number;
   offset: number;
-}): Promise<MemberListItem[]> {
+}): Promise<{ members: MemberListItem[]; total: number }> {
   const values: unknown[] = [params.churchId];
   const conditions = ["church_id = $1"];
 
@@ -39,6 +43,8 @@ export async function listMembersByChurch(params: {
       OR last_name ILIKE $${values.length}
       OR member_code ILIKE $${values.length}
       OR phone ILIKE $${values.length}
+      OR email ILIKE $${values.length}
+      OR city ILIKE $${values.length}
     )`);
   }
 
@@ -47,11 +53,20 @@ export async function listMembersByChurch(params: {
     conditions.push(`status = $${values.length}`);
   }
 
-  values.push(params.limit);
-  const limitParam = values.length;
+  const whereClause = conditions.join(" AND ");
 
-  values.push(params.offset);
-  const offsetParam = values.length;
+  const countResult = await db.query<CountResult>(
+    `
+      SELECT COUNT(*)::text AS total
+      FROM members
+      WHERE ${whereClause}
+    `,
+    values
+  );
+
+  const queryValues = [...values, params.limit, params.offset];
+  const limitParam = queryValues.length - 1;
+  const offsetParam = queryValues.length;
 
   const result = await db.query<MemberListItem>(
     `
@@ -76,13 +91,16 @@ export async function listMembersByChurch(params: {
         status,
         created_at
       FROM members
-      WHERE ${conditions.join(" AND ")}
+      WHERE ${whereClause}
       ORDER BY created_at DESC
       LIMIT $${limitParam}
       OFFSET $${offsetParam}
     `,
-    values
+    queryValues
   );
 
-  return result.rows;
+  return {
+    members: result.rows,
+    total: Number(countResult.rows[0]?.total ?? 0)
+  };
 }
