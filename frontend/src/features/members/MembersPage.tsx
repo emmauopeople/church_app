@@ -5,11 +5,13 @@ import { MemberForm } from './MemberForm';
 import { MemberList } from './MemberList';
 import { MemberProfileCard } from './MemberProfileCard';
 import { createMember, listMembers, updateMember } from './members.api';
-import type { Member, MemberFormValues } from './members.types';
+import type { Member, MemberFormValues, MemberStatus } from './members.types';
 
 const pageSize = 10;
 
 type FormMode = 'create' | 'edit';
+
+type StatusFilter = MemberStatus | '';
 
 function memberToFormValues(member: Member): MemberFormValues {
   return {
@@ -34,6 +36,7 @@ function memberToFormValues(member: Member): MemberFormValues {
 
 export function MembersPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ACTIVE');
   const [page, setPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
   const [members, setMembers] = useState<Member[]>([]);
@@ -58,6 +61,7 @@ export function MembersPage() {
 
           const response = await listMembers({
             search: searchTerm.trim() || undefined,
+            status: statusFilter || undefined,
             page,
             limit: pageSize,
           });
@@ -89,10 +93,15 @@ export function MembersPage() {
     }, 300);
 
     return () => window.clearTimeout(timeoutId);
-  }, [page, refreshKey, searchTerm]);
+  }, [page, refreshKey, searchTerm, statusFilter]);
 
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
+    setPage(1);
+  };
+
+  const handleStatusFilterChange = (value: StatusFilter) => {
+    setStatusFilter(value);
     setPage(1);
   };
 
@@ -130,6 +139,7 @@ export function MembersPage() {
       setSelectedMember(response.data);
       closeForm();
       setSearchTerm('');
+      setStatusFilter('ACTIVE');
       setPage(1);
       setRefreshKey((current) => current + 1);
       setSuccessMessage('Paroissien enregistre avec succes.');
@@ -158,6 +168,31 @@ export function MembersPage() {
       setSuccessMessage('Fiche paroissien mise a jour avec succes.');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Impossible de modifier le paroissien.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSetMemberStatus = async (status: MemberStatus) => {
+    if (!selectedMember) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setErrorMessage('');
+      setSuccessMessage('');
+
+      const response = await updateMember(selectedMember.id, {
+        ...memberToFormValues(selectedMember),
+        status,
+      });
+
+      setSelectedMember(response.data);
+      setRefreshKey((current) => current + 1);
+      setSuccessMessage('Statut du paroissien mis a jour.');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Impossible de mettre a jour le statut.');
     } finally {
       setIsSaving(false);
     }
@@ -193,7 +228,7 @@ export function MembersPage() {
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
-          <div className="rounded-2xl border border-[#E5DED0] bg-white p-4 shadow-sm">
+          <div className="grid gap-3 rounded-2xl border border-[#E5DED0] bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_220px]">
             <label className="flex h-12 items-center gap-3 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4">
               <CatholicIcon name="search" className="h-5 w-5 text-[#9D7A1E]" />
               <input
@@ -203,6 +238,16 @@ export function MembersPage() {
                 className="h-full flex-1 bg-transparent outline-none placeholder:text-[#98A2B3]"
               />
             </label>
+            <select
+              value={statusFilter}
+              onChange={(event) => handleStatusFilterChange(event.target.value as StatusFilter)}
+              className="h-12 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4 font-semibold text-[#344054] outline-none focus:border-[#D4AF37]"
+            >
+              <option value="">Tous les statuts</option>
+              <option value="ACTIVE">Actifs</option>
+              <option value="INACTIVE">Inactifs</option>
+              <option value="DECEASED">Decedes</option>
+            </select>
           </div>
 
           {errorMessage && (
@@ -242,7 +287,12 @@ export function MembersPage() {
         </div>
 
         <div className="xl:sticky xl:top-0 xl:max-h-[calc(100dvh-12rem)] xl:overflow-auto">
-          <MemberProfileCard member={selectedMember} onEdit={openEditForm} />
+          <MemberProfileCard
+            member={selectedMember}
+            isUpdatingStatus={isSaving}
+            onEdit={openEditForm}
+            onSetStatus={handleSetMemberStatus}
+          />
         </div>
       </section>
     </div>
