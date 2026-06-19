@@ -26,6 +26,10 @@ type CountResult = {
   total: string;
 };
 
+type NextCodeResult = {
+  next_number: string;
+};
+
 export async function listMembersByChurch(params: {
   churchId: string;
   search?: string;
@@ -103,4 +107,18 @@ export async function listMembersByChurch(params: {
     members: result.rows,
     total: Number(countResult.rows[0]?.total ?? 0)
   };
+}
+
+export async function getNextMemberCodeByChurch(churchId: string): Promise<string> {
+  const result = await db.query<NextCodeResult>(
+    `
+      SELECT COALESCE(MAX((regexp_match(member_code, '[0-9]+'))[1]::int), 0) + 1 AS next_number
+      FROM members
+      WHERE church_id = $1
+    `,
+    [churchId]
+  );
+
+  const nextNumber = Number(result.rows[0]?.next_number ?? 1);
+  return `MBR-${String(nextNumber).padStart(4, "0")}`;
 }
