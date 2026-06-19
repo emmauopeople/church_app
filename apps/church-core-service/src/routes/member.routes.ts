@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireAuth } from "../middlewares/auth.js";
 import { createMember } from "../repositories/member-create.repository.js";
 import { findMemberByIdForChurch } from "../repositories/member-detail.repository.js";
-import { listMembersByChurch } from "../repositories/member.repository.js";
+import { getNextMemberCodeByChurch, listMembersByChurch } from "../repositories/member.repository.js";
 import { updateMemberForChurch } from "../repositories/member-update.repository.js";
 
 const listMembersQuerySchema = z.object({
@@ -100,6 +100,20 @@ export async function memberRoutes(app: FastifyInstance) {
         count: result.members.length,
         total: result.total,
         totalPages: Math.max(1, Math.ceil(result.total / limit))
+      }
+    });
+  });
+
+  app.get("/core/members/next-code", async (request: FastifyRequest, reply: FastifyReply) => {
+    const authUser = requireAuth(request, reply);
+
+    if (!authUser) return;
+
+    const memberCode = await getNextMemberCodeByChurch(authUser.churchId);
+
+    return reply.send({
+      data: {
+        memberCode
       }
     });
   });
