@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { CatholicIcon } from '../../components/decorative/CatholicIcon';
 import { MemberForm } from './MemberForm';
@@ -12,6 +13,8 @@ const pageSize = 10;
 type FormMode = 'create' | 'edit';
 
 type StatusFilter = MemberStatus | '';
+
+type SacramentShortcut = 'baptism' | 'marriage' | 'confirmation';
 
 function memberToFormValues(member: Member): MemberFormValues {
   return {
@@ -56,6 +59,7 @@ function createEmptyMemberFormValues(memberCode = ''): MemberFormValues {
 }
 
 export function MembersPage() {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ACTIVE');
   const [page, setPage] = useState(1);
@@ -230,6 +234,21 @@ export function MembersPage() {
     }
   };
 
+  const handleAddSacrament = (shortcut: SacramentShortcut) => {
+    if (!selectedMember) {
+      return;
+    }
+
+    const params = new URLSearchParams({
+      memberId: selectedMember.id,
+      memberName: `${selectedMember.firstName} ${selectedMember.lastName}`,
+      memberCode: selectedMember.memberCode,
+      type: shortcut,
+    });
+
+    navigate(`/app/sacraments?${params.toString()}`);
+  };
+
   const formInitialValues = formMode === 'edit' && editingMember
     ? memberToFormValues(editingMember)
     : createInitialValues;
@@ -326,6 +345,7 @@ export function MembersPage() {
             isUpdatingStatus={isSaving}
             onEdit={openEditForm}
             onSetStatus={handleSetMemberStatus}
+            onAddSacrament={handleAddSacrament}
           />
         </div>
       </section>
