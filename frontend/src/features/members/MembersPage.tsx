@@ -303,6 +303,50 @@ export function MembersPage() {
             </select>
           </div>
 
+          <div className="rounded-2xl border border-[#E5DED0] bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Dossier sacramentel</p>
+                <h3 className="font-serif text-xl font-bold text-[#0F3D2E]">
+                  {selectedMember ? `${selectedMember.firstName} ${selectedMember.lastName}` : 'Aucun paroissien selectionne'}
+                </h3>
+                <p className="text-sm text-[#667085]">
+                  {selectedMember ? 'Ouvrir un acte sacramentel pour ce paroissien.' : 'Selectionnez un paroissien dans la liste avant de creer un acte.'}
+                </p>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[420px]">
+                <button
+                  type="button"
+                  disabled={!selectedMember}
+                  onClick={() => handleAddSacrament('baptism')}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-3 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <CatholicIcon name="water" className="h-4 w-4" />
+                  Bapteme
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedMember}
+                  onClick={() => handleAddSacrament('marriage')}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-3 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <CatholicIcon name="rings" className="h-4 w-4" />
+                  Mariage
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedMember}
+                  onClick={() => handleAddSacrament('confirmation')}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-3 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <CatholicIcon name="dove" className="h-4 w-4" />
+                  Confirmation
+                </button>
+              </div>
+            </div>
+          </div>
+
           {errorMessage && (
             <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
               {errorMessage}
@@ -345,7 +389,6 @@ export function MembersPage() {
             isUpdatingStatus={isSaving}
             onEdit={openEditForm}
             onSetStatus={handleSetMemberStatus}
-            onAddSacrament={handleAddSacrament}
           />
         </div>
       </section>
