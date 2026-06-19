@@ -2,19 +2,21 @@ import { getAccessToken } from '../auth/auth.storage';
 import { config } from '../../lib/config';
 import type { Member, MemberFormValues, MemberStatus } from './members.types';
 
-type ListMembersParams = {
+export type ListMembersParams = {
   search?: string;
   status?: MemberStatus;
   page?: number;
   limit?: number;
 };
 
-type ListMembersResponse = {
+export type ListMembersResponse = {
   data: Member[];
   pagination: {
     page: number;
     limit: number;
     count: number;
+    total: number;
+    totalPages: number;
   };
 };
 
