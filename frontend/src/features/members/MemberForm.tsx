@@ -12,6 +12,7 @@ type MemberFormProps = {
 };
 
 const inputClass = 'h-12 w-full rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4 outline-none focus:border-[#D4AF37]';
+const readOnlyInputClass = `${inputClass} cursor-not-allowed bg-[#F8F3E7] font-bold text-[#0F3D2E]`;
 const labelClass = 'space-y-2';
 const labelTextClass = 'text-sm font-semibold text-[#344054]';
 
@@ -92,7 +93,7 @@ export function MemberForm({
             {isEditMode ? 'Modifier la fiche' : 'Nouvelle fiche'}
           </h3>
           <p className="text-sm text-[#667085]">
-            {isEditMode ? 'Corriger les informations du paroissien selectionne.' : 'Formulaire complet pour enregistrer un paroissien.'}
+            {isEditMode ? 'Corriger les informations du paroissien selectionne.' : 'Le code membre est genere automatiquement.'}
           </p>
         </div>
       </div>
@@ -100,7 +101,14 @@ export function MemberForm({
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <label className={labelClass}>
           <span className={labelTextClass}>Code membre</span>
-          <input name="memberCode" placeholder="MBR-0004" className={inputClass} required disabled={isSubmitting} defaultValue={initialValues?.memberCode ?? ''} />
+          <input
+            name="memberCode"
+            placeholder="Generation automatique"
+            className={readOnlyInputClass}
+            required
+            readOnly
+            defaultValue={initialValues?.memberCode ?? ''}
+          />
         </label>
         <label className={labelClass}>
           <span className={labelTextClass}>Nom</span>
