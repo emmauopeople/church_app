@@ -1,9 +1,11 @@
 import { CatholicIcon } from '../../components/decorative/CatholicIcon';
-import type { Member } from './members.types';
+import type { Member, MemberStatus } from './members.types';
 
 type MemberProfileCardProps = {
   member: Member | null;
+  isUpdatingStatus?: boolean;
   onEdit?: () => void;
+  onSetStatus?: (status: MemberStatus) => void;
 };
 
 const maritalStatusLabels = {
@@ -28,7 +30,12 @@ function FieldRow({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
-export function MemberProfileCard({ member, onEdit }: MemberProfileCardProps) {
+export function MemberProfileCard({
+  member,
+  isUpdatingStatus = false,
+  onEdit,
+  onSetStatus,
+}: MemberProfileCardProps) {
   if (!member) {
     return (
       <aside className="rounded-2xl border border-[#E5DED0] bg-white p-6 shadow-sm">
@@ -60,6 +67,39 @@ export function MemberProfileCard({ member, onEdit }: MemberProfileCardProps) {
           <CatholicIcon name="save" className="h-4 w-4" />
           Modifier
         </button>
+      </div>
+
+      <div className="mt-5 grid gap-2">
+        {member.status !== 'ACTIVE' && (
+          <button
+            type="button"
+            disabled={isUpdatingStatus}
+            onClick={() => onSetStatus?.('ACTIVE')}
+            className="rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-2 text-sm font-bold text-[#0F3D2E] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Reactiver
+          </button>
+        )}
+        {member.status === 'ACTIVE' && (
+          <button
+            type="button"
+            disabled={isUpdatingStatus}
+            onClick={() => onSetStatus?.('INACTIVE')}
+            className="rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-2 text-sm font-bold text-[#0F3D2E] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Desactiver
+          </button>
+        )}
+        {member.status !== 'DECEASED' && (
+          <button
+            type="button"
+            disabled={isUpdatingStatus}
+            onClick={() => onSetStatus?.('DECEASED')}
+            className="rounded-xl border border-[#E7C7C7] bg-[#FFF5F5] px-4 py-2 text-sm font-bold text-[#8A1F1F] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Marquer decede
+          </button>
+        )}
       </div>
 
       <div className="mt-6 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] px-4">
