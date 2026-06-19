@@ -3,14 +3,11 @@ import { useEffect, useState } from 'react';
 import { CatholicIcon } from '../../components/decorative/CatholicIcon';
 import type { Member, MemberStatus } from './members.types';
 
-type SacramentShortcut = 'baptism' | 'marriage' | 'confirmation';
-
 type MemberProfileCardProps = {
   member: Member | null;
   isUpdatingStatus?: boolean;
   onEdit?: () => void;
   onSetStatus?: (status: MemberStatus) => void;
-  onAddSacrament?: (shortcut: SacramentShortcut) => void;
 };
 
 const maritalStatusLabels = {
@@ -40,7 +37,6 @@ export function MemberProfileCard({
   isUpdatingStatus = false,
   onEdit,
   onSetStatus,
-  onAddSacrament,
 }: MemberProfileCardProps) {
   const [showDeceasedConfirm, setShowDeceasedConfirm] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -153,33 +149,6 @@ export function MemberProfileCard({
           </div>
         </div>
       )}
-
-      <div className="mt-5 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] p-4">
-        <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Ajouter un sacrement</p>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            onClick={() => onAddSacrament?.('baptism')}
-            className="rounded-xl border border-[#D8C8A2] bg-white px-2 py-2 text-xs font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8]"
-          >
-            Bapteme
-          </button>
-          <button
-            type="button"
-            onClick={() => onAddSacrament?.('marriage')}
-            className="rounded-xl border border-[#D8C8A2] bg-white px-2 py-2 text-xs font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8]"
-          >
-            Mariage
-          </button>
-          <button
-            type="button"
-            onClick={() => onAddSacrament?.('confirmation')}
-            className="rounded-xl border border-[#D8C8A2] bg-white px-2 py-2 text-xs font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8]"
-          >
-            Confirmation
-          </button>
-        </div>
-      </div>
 
       <div className="mt-6 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] px-4">
         <FieldRow label="Statut" value={statusLabels[member.status]} />
