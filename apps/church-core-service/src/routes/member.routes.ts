@@ -84,7 +84,7 @@ export async function memberRoutes(app: FastifyInstance) {
     const { search, status, page, limit } = parsed.data;
     const offset = (page - 1) * limit;
 
-    const members = await listMembersByChurch({
+    const result = await listMembersByChurch({
       churchId: authUser.churchId,
       search,
       status,
@@ -93,11 +93,13 @@ export async function memberRoutes(app: FastifyInstance) {
     });
 
     return reply.send({
-      data: members.map(formatMember),
+      data: result.members.map(formatMember),
       pagination: {
         page,
         limit,
-        count: members.length
+        count: result.members.length,
+        total: result.total,
+        totalPages: Math.max(1, Math.ceil(result.total / limit))
       }
     });
   });
