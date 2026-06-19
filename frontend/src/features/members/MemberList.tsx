@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-
 import type { Member } from './members.types';
 
 type MemberListProps = {
   members: Member[];
   selectedMemberId: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  isLoading?: boolean;
+  onPageChange: (page: number) => void;
   onSelectMember: (member: Member) => void;
 };
 
@@ -19,23 +23,19 @@ const statusLabels = {
   DECEASED: 'Decede',
 };
 
-const pageSize = 10;
-
-export function MemberList({ members, selectedMemberId, onSelectMember }: MemberListProps) {
-  const [page, setPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(members.length / pageSize));
-
-  useEffect(() => {
-    setPage(1);
-  }, [members]);
-
-  const visibleMembers = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return members.slice(start, start + pageSize);
-  }, [members, page]);
-
-  const startItem = members.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const endItem = Math.min(page * pageSize, members.length);
+export function MemberList({
+  members,
+  selectedMemberId,
+  page,
+  pageSize,
+  total,
+  totalPages,
+  isLoading = false,
+  onPageChange,
+  onSelectMember,
+}: MemberListProps) {
+  const startItem = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endItem = Math.min(page * pageSize, total);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[#E5DED0] bg-white shadow-sm">
@@ -45,7 +45,7 @@ export function MemberList({ members, selectedMemberId, onSelectMember }: Member
           <p className="text-sm text-[#667085]">Selectionnez une fiche pour voir les details.</p>
         </div>
         <p className="text-sm font-semibold text-[#9D7A1E]">
-          {startItem}-{endItem} sur {members.length}
+          {startItem}-{endItem} sur {total}
         </p>
       </div>
 
@@ -62,7 +62,7 @@ export function MemberList({ members, selectedMemberId, onSelectMember }: Member
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEE6D6]">
-            {visibleMembers.map((member) => {
+            {members.map((member) => {
               const isActive = member.id === selectedMemberId;
 
               return (
@@ -88,10 +88,18 @@ export function MemberList({ members, selectedMemberId, onSelectMember }: Member
               );
             })}
 
-            {visibleMembers.length === 0 && (
+            {!isLoading && members.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-5 py-10 text-center text-[#667085]">
                   Aucun paroissien trouve.
+                </td>
+              </tr>
+            )}
+
+            {isLoading && (
+              <tr>
+                <td colSpan={6} className="px-5 py-10 text-center text-[#667085]">
+                  Chargement des paroissiens...
                 </td>
               </tr>
             )}
@@ -106,16 +114,16 @@ export function MemberList({ members, selectedMemberId, onSelectMember }: Member
         <div className="flex gap-3">
           <button
             type="button"
-            disabled={page === 1}
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            disabled={page === 1 || isLoading}
+            onClick={() => onPageChange(Math.max(1, page - 1))}
             className="rounded-xl border border-[#D8C8A2] px-4 py-2 text-sm font-semibold text-[#0F3D2E] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Precedent
           </button>
           <button
             type="button"
-            disabled={page === totalPages}
-            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+            disabled={page === totalPages || isLoading}
+            onClick={() => onPageChange(Math.min(totalPages, page + 1))}
             className="rounded-xl border border-[#D8C8A2] bg-[#0F3D2E] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
             Suivant
