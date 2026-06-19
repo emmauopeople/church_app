@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 import { CatholicIcon } from '../../components/decorative/CatholicIcon';
 import type { Member, MemberStatus } from './members.types';
 
@@ -36,6 +38,14 @@ export function MemberProfileCard({
   onEdit,
   onSetStatus,
 }: MemberProfileCardProps) {
+  const [showDeceasedConfirm, setShowDeceasedConfirm] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+
+  useEffect(() => {
+    setShowDeceasedConfirm(false);
+    setConfirmText('');
+  }, [member?.id]);
+
   if (!member) {
     return (
       <aside className="rounded-2xl border border-[#E5DED0] bg-white p-6 shadow-sm">
@@ -51,6 +61,18 @@ export function MemberProfileCard({
   const secondaryStatusAction = member.status === 'ACTIVE'
     ? { label: 'Desactiver', status: 'INACTIVE' as MemberStatus }
     : { label: 'Reactiver', status: 'ACTIVE' as MemberStatus };
+
+  const canMarkDeceased = confirmText.trim().toLowerCase() === 'decede';
+
+  const handleConfirmDeceased = () => {
+    if (!canMarkDeceased) {
+      return;
+    }
+
+    onSetStatus?.('DECEASED');
+    setShowDeceasedConfirm(false);
+    setConfirmText('');
+  };
 
   return (
     <aside className="rounded-2xl border border-[#E5DED0] bg-white p-6 shadow-sm">
@@ -82,12 +104,51 @@ export function MemberProfileCard({
         <button
           type="button"
           disabled={isUpdatingStatus || member.status === 'DECEASED'}
-          onClick={() => onSetStatus?.('DECEASED')}
+          onClick={() => setShowDeceasedConfirm(true)}
           className="rounded-xl border border-[#E7C7C7] bg-[#FFF5F5] px-2 py-2 text-xs font-bold text-[#8A1F1F] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
         >
           Decede
         </button>
       </div>
+
+      {showDeceasedConfirm && member.status !== 'DECEASED' && (
+        <div className="mt-4 rounded-xl border border-[#E7C7C7] bg-[#FFF5F5] p-4 text-left">
+          <p className="text-sm font-bold text-[#8A1F1F]">
+            Are you sure you want to mark this parishioner as decede?
+          </p>
+          <p className="mt-2 text-xs font-semibold text-[#667085]">
+            To continue, type <span className="font-bold text-[#8A1F1F]">decede</span> below.
+          </p>
+          <input
+            value={confirmText}
+            onChange={(event) => setConfirmText(event.target.value)}
+            disabled={isUpdatingStatus}
+            className="mt-3 h-11 w-full rounded-xl border border-[#E7C7C7] bg-white px-3 text-sm outline-none focus:border-[#8A1F1F]"
+            placeholder="type decede"
+          />
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={isUpdatingStatus}
+              onClick={() => {
+                setShowDeceasedConfirm(false);
+                setConfirmText('');
+              }}
+              className="rounded-xl border border-[#D8C8A2] bg-white px-3 py-2 text-sm font-bold text-[#0F3D2E] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              disabled={!canMarkDeceased || isUpdatingStatus}
+              onClick={handleConfirmDeceased}
+              className="rounded-xl bg-[#8A1F1F] px-3 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Marquer decede
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] px-4">
         <FieldRow label="Statut" value={statusLabels[member.status]} />
