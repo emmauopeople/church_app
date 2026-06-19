@@ -114,17 +114,17 @@ export function MemberProfileCard({
       {showDeceasedConfirm && member.status !== 'DECEASED' && (
         <div className="mt-4 rounded-xl border border-[#E7C7C7] bg-[#FFF5F5] p-4 text-left">
           <p className="text-sm font-bold text-[#8A1F1F]">
-            Are you sure you want to mark this parishioner as decede?
+            Etes-vous sur de vouloir marquer ce paroissien comme decede ?
           </p>
           <p className="mt-2 text-xs font-semibold text-[#667085]">
-            To continue, type <span className="font-bold text-[#8A1F1F]">decede</span> below.
+            Pour continuer, tapez <span className="font-bold text-[#8A1F1F]">decede</span> ci-dessous.
           </p>
           <input
             value={confirmText}
             onChange={(event) => setConfirmText(event.target.value)}
             disabled={isUpdatingStatus}
             className="mt-3 h-11 w-full rounded-xl border border-[#E7C7C7] bg-white px-3 text-sm outline-none focus:border-[#8A1F1F]"
-            placeholder="type decede"
+            placeholder="tapez decede"
           />
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
