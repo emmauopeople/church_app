@@ -13,6 +13,8 @@ export type SacramentListItem = {
   sacrament_date: string;
   place: string | null;
   officiant: string | null;
+  sponsor1_name: string | null;
+  sponsor2_name: string | null;
   notes: string | null;
   created_by: string;
   created_at: Date;
@@ -60,6 +62,8 @@ export async function listSacramentsByChurch(params: {
         s.sacrament_date,
         s.place,
         s.officiant,
+        s.sponsor1_name,
+        s.sponsor2_name,
         s.notes,
         s.created_by,
         s.created_at,
