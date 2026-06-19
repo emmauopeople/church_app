@@ -4,7 +4,7 @@ import { CatholicIcon } from '../../components/decorative/CatholicIcon';
 import { MemberForm } from './MemberForm';
 import { MemberList } from './MemberList';
 import { MemberProfileCard } from './MemberProfileCard';
-import { createMember, listMembers, updateMember } from './members.api';
+import { createMember, getNextMemberCode, listMembers, updateMember } from './members.api';
 import type { Member, MemberFormValues, MemberStatus } from './members.types';
 
 const pageSize = 10;
@@ -34,6 +34,27 @@ function memberToFormValues(member: Member): MemberFormValues {
   };
 }
 
+function createEmptyMemberFormValues(memberCode = ''): MemberFormValues {
+  return {
+    memberCode,
+    firstName: '',
+    lastName: '',
+    middleName: null,
+    dateOfBirth: null,
+    birthPlace: null,
+    gender: null,
+    phone: null,
+    email: null,
+    address: null,
+    city: 'Ouagadougou',
+    country: 'Burkina Faso',
+    fatherName: null,
+    motherName: null,
+    maritalStatus: null,
+    status: 'ACTIVE',
+  };
+}
+
 export function MembersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ACTIVE');
@@ -43,6 +64,7 @@ export function MembersPage() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [formMode, setFormMode] = useState<FormMode | null>(null);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [createInitialValues, setCreateInitialValues] = useState<MemberFormValues | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -105,11 +127,19 @@ export function MembersPage() {
     setPage(1);
   };
 
-  const openCreateForm = () => {
+  const openCreateForm = async () => {
     setFormMode('create');
     setEditingMember(null);
+    setCreateInitialValues(createEmptyMemberFormValues());
     setErrorMessage('');
     setSuccessMessage('');
+
+    try {
+      const response = await getNextMemberCode();
+      setCreateInitialValues(createEmptyMemberFormValues(response.data.memberCode));
+    } catch {
+      setErrorMessage('Impossible de generer le code membre automatiquement. Vous pouvez le saisir manuellement.');
+    }
   };
 
   const openEditForm = () => {
@@ -119,6 +149,7 @@ export function MembersPage() {
 
     setFormMode('edit');
     setEditingMember(selectedMember);
+    setCreateInitialValues(undefined);
     setErrorMessage('');
     setSuccessMessage('');
   };
@@ -126,6 +157,7 @@ export function MembersPage() {
   const closeForm = () => {
     setFormMode(null);
     setEditingMember(null);
+    setCreateInitialValues(undefined);
   };
 
   const handleCreateMember = async (values: MemberFormValues) => {
@@ -198,7 +230,9 @@ export function MembersPage() {
     }
   };
 
-  const formInitialValues = editingMember ? memberToFormValues(editingMember) : undefined;
+  const formInitialValues = formMode === 'edit' && editingMember
+    ? memberToFormValues(editingMember)
+    : createInitialValues;
 
   return (
     <div className="space-y-6">
@@ -264,7 +298,7 @@ export function MembersPage() {
 
           {formMode && (
             <MemberForm
-              key={`${formMode}-${editingMember?.id ?? 'new'}`}
+              key={`${formMode}-${editingMember?.id ?? formInitialValues?.memberCode ?? 'new'}`}
               mode={formMode}
               initialValues={formInitialValues}
               isSubmitting={isSaving}
