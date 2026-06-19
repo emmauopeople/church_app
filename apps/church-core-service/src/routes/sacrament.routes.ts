@@ -12,6 +12,8 @@ const createSacramentSchema = z.object({
   sacramentDate: z.string().min(10),
   place: z.string().optional().nullable(),
   officiant: z.string().optional().nullable(),
+  sponsor1Name: z.string().min(1),
+  sponsor2Name: z.string().min(1),
   notes: z.string().optional().nullable()
 });
 
@@ -39,6 +41,8 @@ function formatSacrament(sacrament: any) {
     sacramentDate: sacrament.sacrament_date,
     place: sacrament.place,
     officiant: sacrament.officiant,
+    sponsor1Name: sacrament.sponsor1_name,
+    sponsor2Name: sacrament.sponsor2_name,
     notes: sacrament.notes,
     createdBy: sacrament.created_by,
     createdAt: sacrament.created_at,
