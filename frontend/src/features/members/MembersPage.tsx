@@ -4,19 +4,22 @@ import { CatholicIcon } from '../../components/decorative/CatholicIcon';
 import { MemberForm } from './MemberForm';
 import { MemberList } from './MemberList';
 import { MemberProfileCard } from './MemberProfileCard';
-import { listMembers } from './members.api';
-import type { Member } from './members.types';
+import { createMember, listMembers } from './members.api';
+import type { Member, MemberFormValues } from './members.types';
 
 const pageSize = 10;
 
 export function MembersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [pagination, setPagination] = useState({
     total: 0,
     totalPages: 1,
@@ -62,11 +65,32 @@ export function MembersPage() {
     }, 300);
 
     return () => window.clearTimeout(timeoutId);
-  }, [page, searchTerm]);
+  }, [page, refreshKey, searchTerm]);
 
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
     setPage(1);
+  };
+
+  const handleCreateMember = async (values: MemberFormValues) => {
+    try {
+      setIsSaving(true);
+      setErrorMessage('');
+      setSuccessMessage('');
+
+      const response = await createMember(values);
+
+      setSelectedMember(response.data);
+      setShowForm(false);
+      setSearchTerm('');
+      setPage(1);
+      setRefreshKey((current) => current + 1);
+      setSuccessMessage('Paroissien enregistre avec succes.');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Impossible d enregistrer le paroissien.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -115,7 +139,19 @@ export function MembersPage() {
             </div>
           )}
 
-          {showForm && <MemberForm onCancel={() => setShowForm(false)} />}
+          {successMessage && (
+            <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-700">
+              {successMessage}
+            </div>
+          )}
+
+          {showForm && (
+            <MemberForm
+              isSubmitting={isSaving}
+              onCancel={() => setShowForm(false)}
+              onSubmit={handleCreateMember}
+            />
+          )}
 
           <MemberList
             members={members}
