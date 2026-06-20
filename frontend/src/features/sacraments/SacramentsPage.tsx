@@ -1,13 +1,22 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { CatholicIcon } from '../../components/decorative/CatholicIcon';
+import { listMembers } from '../members/members.api';
+import type { Member } from '../members/members.types';
 import { createSacrament, listSacraments, listSacramentTypes } from './sacraments.api';
 import type { Sacrament, SacramentType } from './sacraments.types';
 
-const inputClass = 'h-12 w-full rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4 outline-none focus:border-[#D4AF37]';
-const labelClass = 'space-y-2';
-const labelTextClass = 'text-sm font-semibold text-[#344054]';
+const inputClass = 'h-10 w-full rounded-lg border border-[#D9CFB8] bg-[#FFFDF8] px-3 text-sm outline-none focus:border-[#D4AF37]';
+const labelClass = 'space-y-1.5';
+const labelTextClass = 'text-xs font-bold uppercase tracking-wide text-[#667085]';
+
+type SelectedParishioner = {
+  id: string;
+  memberCode: string;
+  fullName: string;
+  dateOfBirth?: string | null;
+};
 
 function getText(formData: FormData, key: string) {
   return String(formData.get(key) ?? '').trim();
@@ -16,6 +25,15 @@ function getText(formData: FormData, key: string) {
 function getNullableText(formData: FormData, key: string) {
   const value = getText(formData, key);
   return value || null;
+}
+
+function toSelectedParishioner(member: Member): SelectedParishioner {
+  return {
+    id: member.id,
+    memberCode: member.memberCode,
+    fullName: `${member.firstName} ${member.lastName}`,
+    dateOfBirth: member.dateOfBirth,
+  };
 }
 
 function findRequestedType(types: SacramentType[], requestedType: string | null) {
@@ -48,7 +66,7 @@ function isConfirmationType(type?: SacramentType) {
   return code.includes('confirm') || name.includes('confirm');
 }
 
-function formatDate(value: string) {
+function formatDate(value?: string | null) {
   return value ? value.slice(0, 10) : '-';
 }
 
@@ -60,11 +78,20 @@ export function SacramentsPage() {
   const queryType = searchParams.get('type');
 
   const [sacramentTypes, setSacramentTypes] = useState<SacramentType[]>([]);
-  const [sacraments, setSacraments] = useState<Sacrament[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  const [selectedParishioner, setSelectedParishioner] = useState<SelectedParishioner | null>(null);
+  const [records, setRecords] = useState<Sacrament[]>([]);
+  const [recordSearchTerm, setRecordSearchTerm] = useState('');
+  const [recordTypeFilter, setRecordTypeFilter] = useState('');
+  const [selectedRecord, setSelectedRecord] = useState<Sacrament | null>(null);
   const [selectedTypeId, setSelectedTypeId] = useState('');
   const [sponsor1Name, setSponsor1Name] = useState('');
   const [sponsor2Name, setSponsor2Name] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [refreshRecordsKey, setRefreshRecordsKey] = useState(0);
+  const [isLoadingTypes, setIsLoadingTypes] = useState(false);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [isLoadingRecords, setIsLoadingRecords] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -72,54 +99,129 @@ export function SacramentsPage() {
   const selectedSacramentType = sacramentTypes.find((type) => String(type.id) === selectedTypeId);
   const selectedIsConfirmation = isConfirmationType(selectedSacramentType);
 
+  const filteredRecords = useMemo(() => {
+    const search = recordSearchTerm.trim().toLowerCase();
+
+    if (!search) {
+      return records;
+    }
+
+    return records.filter((record) => {
+      const memberName = `${record.memberFirstName} ${record.memberLastName}`.toLowerCase();
+      return (
+        memberName.includes(search) ||
+        record.memberCode.toLowerCase().includes(search) ||
+        record.certificateNumber.toLowerCase().includes(search) ||
+        record.sacramentTypeName.toLowerCase().includes(search)
+      );
+    });
+  }, [recordSearchTerm, records]);
+
   useEffect(() => {
-    async function loadSacramentPage() {
+    if (queryMemberId) {
+      setSelectedParishioner({
+        id: queryMemberId,
+        memberCode: queryMemberCode,
+        fullName: queryMemberName || 'Paroissien selectionne',
+      });
+    }
+  }, [queryMemberCode, queryMemberId, queryMemberName]);
+
+  useEffect(() => {
+    async function loadTypes() {
       try {
-        setIsLoading(true);
+        setIsLoadingTypes(true);
         setErrorMessage('');
 
-        const [typesResponse, sacramentsResponse] = await Promise.all([
-          listSacramentTypes(),
-          listSacraments({ memberId: queryMemberId || undefined, page: 1, limit: 20 }),
-        ]);
+        const response = await listSacramentTypes();
+        setSacramentTypes(response.data);
 
-        setSacramentTypes(typesResponse.data);
-        setSacraments(sacramentsResponse.data);
-
-        const requestedType = findRequestedType(typesResponse.data, queryType);
+        const requestedType = findRequestedType(response.data, queryType);
         setSelectedTypeId(requestedType ? String(requestedType.id) : '');
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : 'Impossible de charger les sacrements.');
+        setErrorMessage(error instanceof Error ? error.message : 'Impossible de charger les types de sacrement.');
         setSacramentTypes([]);
-        setSacraments([]);
       } finally {
-        setIsLoading(false);
+        setIsLoadingTypes(false);
       }
     }
 
-    loadSacramentPage();
-  }, [queryMemberId, queryType]);
+    loadTypes();
+  }, [queryType]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      async function loadMembers() {
+        try {
+          setIsLoadingMembers(true);
+          setErrorMessage('');
+
+          const response = await listMembers({
+            search: memberSearchTerm.trim() || undefined,
+            status: 'ACTIVE',
+            page: 1,
+            limit: 10,
+          });
+
+          setMembers(response.data);
+
+          const selectedFromList = response.data.find((member) => member.id === selectedParishioner?.id);
+          if (selectedFromList) {
+            setSelectedParishioner(toSelectedParishioner(selectedFromList));
+          }
+        } catch (error) {
+          setErrorMessage(error instanceof Error ? error.message : 'Impossible de charger les paroissiens.');
+          setMembers([]);
+        } finally {
+          setIsLoadingMembers(false);
+        }
+      }
+
+      loadMembers();
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [memberSearchTerm, selectedParishioner?.id]);
+
+  useEffect(() => {
+    async function loadRecords() {
+      try {
+        setIsLoadingRecords(true);
+        setErrorMessage('');
+
+        const response = await listSacraments({
+          sacramentTypeId: recordTypeFilter ? Number(recordTypeFilter) : undefined,
+          page: 1,
+          limit: 100,
+        });
+
+        setRecords(response.data);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : 'Impossible de charger les actes sacramentels.');
+        setRecords([]);
+      } finally {
+        setIsLoadingRecords(false);
+      }
+    }
+
+    loadRecords();
+  }, [recordTypeFilter, refreshRecordsKey]);
 
   useEffect(() => {
     if (selectedIsConfirmation) {
-      setSponsor1Name((current) => current || 'N/A');
-      setSponsor2Name((current) => current || 'N/A');
-    } else if (sponsor1Name === 'N/A' && sponsor2Name === 'N/A') {
-      setSponsor1Name('');
-      setSponsor2Name('');
+      setSponsor1Name('N/A');
+      setSponsor2Name('N/A');
+    } else {
+      setSponsor1Name((current) => (current === 'N/A' ? '' : current));
+      setSponsor2Name((current) => (current === 'N/A' ? '' : current));
     }
-  }, [selectedIsConfirmation, sponsor1Name, sponsor2Name]);
-
-  const reloadSacraments = async () => {
-    const response = await listSacraments({ memberId: queryMemberId || undefined, page: 1, limit: 20 });
-    setSacraments(response.data);
-  };
+  }, [selectedIsConfirmation]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!queryMemberId) {
-      setErrorMessage('Selectionnez d abord un paroissien dans le module Paroissiens.');
+    if (!selectedParishioner) {
+      setErrorMessage('Selectionnez d abord un paroissien dans la liste.');
       return;
     }
 
@@ -151,7 +253,7 @@ export function SacramentsPage() {
       setSuccessMessage('');
 
       await createSacrament({
-        memberId: queryMemberId,
+        memberId: selectedParishioner.id,
         sacramentTypeId,
         certificateNumber,
         sacramentDate,
@@ -166,7 +268,7 @@ export function SacramentsPage() {
       setSelectedTypeId(String(sacramentTypeId));
       setSponsor1Name(selectedIsConfirmation ? 'N/A' : '');
       setSponsor2Name(selectedIsConfirmation ? 'N/A' : '');
-      await reloadSacraments();
+      setRefreshRecordsKey((current) => current + 1);
       setSuccessMessage('Acte de sacrement enregistre avec succes.');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Impossible d enregistrer le sacrement.');
@@ -185,7 +287,7 @@ export function SacramentsPage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Registre sacramentel</p>
             <h2 className="font-serif text-3xl font-bold text-[#0F3D2E]">Sacrements</h2>
-            <p className="text-[#667085]">Enregistrer les actes de bapteme, mariage et confirmation.</p>
+            <p className="text-[#667085]">Selectionnez un paroissien, enregistrez un sacrement, puis gerez les actes existants.</p>
           </div>
         </div>
       </section>
@@ -202,23 +304,82 @@ export function SacramentsPage() {
         </div>
       )}
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <form onSubmit={handleSubmit} className="rounded-2xl border border-[#E5DED0] bg-white p-6 shadow-sm">
-          <div className="mb-6 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] p-4">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)]">
+        <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Selection du paroissien</p>
+              <h3 className="font-serif text-xl font-bold text-[#0F3D2E]">Rechercher un paroissien</h3>
+            </div>
+            {isLoadingMembers && <span className="text-xs font-semibold text-[#667085]">Chargement...</span>}
+          </div>
+
+          <label className="mt-4 flex h-11 items-center gap-3 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4">
+            <CatholicIcon name="search" className="h-5 w-5 text-[#9D7A1E]" />
+            <input
+              value={memberSearchTerm}
+              onChange={(event) => setMemberSearchTerm(event.target.value)}
+              placeholder="Nom, code, telephone, email ou ville"
+              className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-[#98A2B3]"
+            />
+          </label>
+
+          <div className="mt-4 overflow-hidden rounded-xl border border-[#EEE6D6]">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-[#FFF9EE] text-xs uppercase tracking-wide text-[#9D7A1E]">
+                <tr>
+                  <th className="px-3 py-3">Code</th>
+                  <th className="px-3 py-3">Nom</th>
+                  <th className="px-3 py-3">Naissance</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#EEE6D6]">
+                {members.map((member) => {
+                  const isSelected = selectedParishioner?.id === member.id;
+
+                  return (
+                    <tr
+                      key={member.id}
+                      onClick={() => setSelectedParishioner(toSelectedParishioner(member))}
+                      className={`cursor-pointer transition ${isSelected ? 'bg-[#F4E8C8]' : 'bg-white hover:bg-[#FFF9EE]'}`}
+                    >
+                      <td className="px-3 py-3 font-bold text-[#0F3D2E]">{member.memberCode}</td>
+                      <td className="px-3 py-3 font-semibold text-[#1F2933]">{member.firstName} {member.lastName}</td>
+                      <td className="px-3 py-3 text-[#667085]">{formatDate(member.dateOfBirth)}</td>
+                    </tr>
+                  );
+                })}
+
+                {!isLoadingMembers && members.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-3 py-6 text-center text-sm font-semibold text-[#667085]">
+                      Aucun paroissien trouve.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+          <div className="mb-5 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Paroissien selectionne</p>
-            {queryMemberId ? (
-              <div className="mt-2">
-                <p className="font-serif text-xl font-bold text-[#0F3D2E]">{queryMemberName || 'Paroissien selectionne'}</p>
-                <p className="text-sm font-semibold text-[#667085]">{queryMemberCode}</p>
+            {selectedParishioner ? (
+              <div className="mt-1">
+                <p className="font-serif text-xl font-bold text-[#0F3D2E]">{selectedParishioner.fullName}</p>
+                <p className="text-sm font-semibold text-[#667085]">
+                  {selectedParishioner.memberCode} - Naissance: {formatDate(selectedParishioner.dateOfBirth)}
+                </p>
               </div>
             ) : (
               <p className="mt-2 text-sm font-semibold text-[#667085]">
-                Selectionnez un paroissien dans le module Paroissiens, puis cliquez Bapteme, Mariage ou Confirmation.
+                Selectionnez un paroissien a gauche avant d enregistrer un sacrement.
               </p>
             )}
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2">
             <label className={labelClass}>
               <span className={labelTextClass}>Type de sacrement</span>
               <select
@@ -226,23 +387,21 @@ export function SacramentsPage() {
                 className={inputClass}
                 value={selectedTypeId}
                 onChange={(event) => setSelectedTypeId(event.target.value)}
-                disabled={isSaving || isLoading}
+                disabled={isSaving || isLoadingTypes}
                 required
               >
                 <option value="">Selectionner</option>
                 {sacramentTypes.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name}
-                  </option>
+                  <option key={type.id} value={type.id}>{type.name}</option>
                 ))}
               </select>
             </label>
             <label className={labelClass}>
-              <span className={labelTextClass}>Numero de certificat</span>
+              <span className={labelTextClass}>Numero certificat</span>
               <input name="certificateNumber" className={inputClass} placeholder="CERT-0001" disabled={isSaving} required />
             </label>
             <label className={labelClass}>
-              <span className={labelTextClass}>Date du sacrement</span>
+              <span className={labelTextClass}>Date</span>
               <input name="sacramentDate" type="date" className={inputClass} disabled={isSaving} required />
             </label>
             <label className={labelClass}>
@@ -250,7 +409,7 @@ export function SacramentsPage() {
               <input name="place" className={inputClass} defaultValue="Paroisse" disabled={isSaving} />
             </label>
             <label className={labelClass}>
-              <span className={labelTextClass}>Celebrant / Officiant</span>
+              <span className={labelTextClass}>Officiant</span>
               <input name="officiant" className={inputClass} disabled={isSaving} />
             </label>
             <label className={labelClass}>
@@ -281,63 +440,149 @@ export function SacramentsPage() {
               <span className={labelTextClass}>Notes</span>
               <textarea
                 name="notes"
-                className="min-h-24 w-full rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4 py-3 outline-none focus:border-[#D4AF37]"
+                className="min-h-20 w-full rounded-lg border border-[#D9CFB8] bg-[#FFFDF8] px-3 py-2 text-sm outline-none focus:border-[#D4AF37]"
                 disabled={isSaving}
               />
             </label>
           </div>
 
-          <p className="mt-4 text-xs font-semibold text-[#667085]">
-            Sponsor 1 et Sponsor 2 sont obligatoires. Pour la confirmation, vous pouvez utiliser N/A si non applicable.
+          <p className="mt-3 text-xs font-semibold text-[#667085]">
+            Sponsor 1 et Sponsor 2 sont obligatoires. Pour la confirmation, utilisez N/A si non applicable.
           </p>
 
-          <div className="mt-6 flex justify-end">
+          <div className="mt-5 flex justify-end">
             <button
               type="submit"
-              disabled={isSaving || !queryMemberId}
-              className="rounded-xl bg-[#0F3D2E] px-5 py-3 font-semibold text-white hover:bg-[#145C43] disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isSaving || !selectedParishioner}
+              className="rounded-xl bg-[#0F3D2E] px-5 py-2.5 font-semibold text-white hover:bg-[#145C43] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSaving ? 'Enregistrement...' : 'Enregistrer le sacrement'}
             </button>
           </div>
         </form>
-
-        <aside className="rounded-2xl border border-[#E5DED0] bg-white p-6 shadow-sm">
-          <h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">Historique</h3>
-          <p className="mt-1 text-sm text-[#667085]">
-            {queryMemberId ? 'Derniers sacrements du paroissien.' : 'Derniers sacrements enregistres.'}
-          </p>
-
-          <div className="mt-5 space-y-3">
-            {sacraments.map((sacrament) => (
-              <div key={sacrament.id} className="rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] p-4">
-                <p className="font-bold text-[#0F3D2E]">{sacrament.sacramentTypeName}</p>
-                <p className="text-sm font-semibold text-[#1F2933]">
-                  {sacrament.memberFirstName} {sacrament.memberLastName}
-                </p>
-                <p className="mt-1 text-xs font-semibold text-[#667085]">
-                  Certificat: {sacrament.certificateNumber} - Date: {formatDate(sacrament.sacramentDate)}
-                </p>
-                <p className="mt-1 text-xs font-semibold text-[#667085]">
-                  Sponsor 1: {sacrament.sponsor1Name || '-'} - Sponsor 2: {sacrament.sponsor2Name || '-'}
-                </p>
-              </div>
-            ))}
-
-            {!isLoading && sacraments.length === 0 && (
-              <p className="rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] p-4 text-sm font-semibold text-[#667085]">
-                Aucun sacrement enregistre.
-              </p>
-            )}
-
-            {isLoading && (
-              <p className="rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] p-4 text-sm font-semibold text-[#667085]">
-                Chargement des sacrements...
-              </p>
-            )}
-          </div>
-        </aside>
       </section>
+
+      <section className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Registres existants</p>
+            <h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">Actes sacramentels</h3>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px] xl:w-[620px]">
+            <label className="flex h-11 items-center gap-3 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4">
+              <CatholicIcon name="search" className="h-5 w-5 text-[#9D7A1E]" />
+              <input
+                value={recordSearchTerm}
+                onChange={(event) => setRecordSearchTerm(event.target.value)}
+                placeholder="Rechercher acte, paroissien ou certificat"
+                className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-[#98A2B3]"
+              />
+            </label>
+            <select
+              value={recordTypeFilter}
+              onChange={(event) => setRecordTypeFilter(event.target.value)}
+              className="h-11 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4 text-sm font-semibold text-[#344054] outline-none focus:border-[#D4AF37]"
+            >
+              <option value="">Tous les sacrements</option>
+              {sacramentTypes.map((type) => (
+                <option key={type.id} value={type.id}>{type.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-5 overflow-hidden rounded-xl border border-[#EEE6D6]">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-[#FFF9EE] text-xs uppercase tracking-wide text-[#9D7A1E]">
+              <tr>
+                <th className="px-4 py-3">Paroissien</th>
+                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">Certificat</th>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Officiant</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#EEE6D6]">
+              {filteredRecords.map((record) => (
+                <tr
+                  key={record.id}
+                  onClick={() => setSelectedRecord(record)}
+                  className="cursor-pointer bg-white transition hover:bg-[#FFF9EE]"
+                >
+                  <td className="px-4 py-3 font-semibold text-[#1F2933]">
+                    {record.memberFirstName} {record.memberLastName}
+                    <span className="block text-xs font-bold text-[#667085]">{record.memberCode}</span>
+                  </td>
+                  <td className="px-4 py-3 font-bold text-[#0F3D2E]">{record.sacramentTypeName}</td>
+                  <td className="px-4 py-3 text-[#667085]">{record.certificateNumber}</td>
+                  <td className="px-4 py-3 text-[#667085]">{formatDate(record.sacramentDate)}</td>
+                  <td className="px-4 py-3 text-[#667085]">{record.officiant || '-'}</td>
+                </tr>
+              ))}
+
+              {!isLoadingRecords && filteredRecords.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm font-semibold text-[#667085]">
+                    Aucun acte sacramentel trouve.
+                  </td>
+                </tr>
+              )}
+
+              {isLoadingRecords && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm font-semibold text-[#667085]">
+                    Chargement des actes...
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {selectedRecord && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/20" role="dialog" aria-modal="true">
+          <aside className="h-full w-full max-w-md overflow-auto border-l border-[#D8C8A2] bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Detail de l acte</p>
+                <h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{selectedRecord.sacramentTypeName}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedRecord(null)}
+                className="rounded-lg border border-[#D8C8A2] px-3 py-1.5 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]"
+              >
+                Fermer
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-3 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] p-4 text-sm">
+              <p><span className="font-bold text-[#9D7A1E]">Paroissien:</span> {selectedRecord.memberFirstName} {selectedRecord.memberLastName}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Code:</span> {selectedRecord.memberCode}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Certificat:</span> {selectedRecord.certificateNumber}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Date:</span> {formatDate(selectedRecord.sacramentDate)}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Lieu:</span> {selectedRecord.place || '-'}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Officiant:</span> {selectedRecord.officiant || '-'}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Sponsor 1:</span> {selectedRecord.sponsor1Name || '-'}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Sponsor 2:</span> {selectedRecord.sponsor2Name || '-'}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Notes:</span> {selectedRecord.notes || '-'}</p>
+            </div>
+
+            <div className="mt-5 grid gap-2">
+              <button type="button" className="rounded-xl border border-[#D8C8A2] px-4 py-2.5 font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">
+                Modifier
+              </button>
+              <button type="button" className="rounded-xl border border-[#D8C8A2] px-4 py-2.5 font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">
+                Apercu certificat
+              </button>
+              <button type="button" className="rounded-xl bg-[#0F3D2E] px-4 py-2.5 font-bold text-white hover:bg-[#145C43]">
+                Exporter PDF
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }
