@@ -4,8 +4,8 @@ import { useSearchParams } from 'react-router-dom';
 import { CatholicIcon } from '../../components/decorative/CatholicIcon';
 import { listMembers } from '../members/members.api';
 import type { Member } from '../members/members.types';
-import { createSacrament, listSacraments, listSacramentTypes } from './sacraments.api';
-import type { Sacrament, SacramentType } from './sacraments.types';
+import { createSacrament, listSacraments, listSacramentTypes, updateSacrament } from './sacraments.api';
+import type { Sacrament, SacramentType, UpdateSacramentPayload } from './sacraments.types';
 
 const inputClass = 'h-10 w-full rounded-lg border border-[#D9CFB8] bg-[#FFFDF8] px-3 text-sm outline-none focus:border-[#D4AF37]';
 const labelClass = 'space-y-1.5';
@@ -33,6 +33,14 @@ function toSelectedParishioner(member: Member): SelectedParishioner {
     memberCode: member.memberCode,
     fullName: `${member.firstName} ${member.lastName}`,
     dateOfBirth: member.dateOfBirth,
+  };
+}
+
+function toSelectedParishionerFromRecord(record: Sacrament): SelectedParishioner {
+  return {
+    id: record.memberId,
+    memberCode: record.memberCode,
+    fullName: `${record.memberFirstName} ${record.memberLastName}`,
   };
 }
 
@@ -85,6 +93,7 @@ export function SacramentsPage() {
   const [recordSearchTerm, setRecordSearchTerm] = useState('');
   const [recordTypeFilter, setRecordTypeFilter] = useState('');
   const [selectedRecord, setSelectedRecord] = useState<Sacrament | null>(null);
+  const [editingRecord, setEditingRecord] = useState<Sacrament | null>(null);
   const [selectedTypeId, setSelectedTypeId] = useState('');
   const [sponsor1Name, setSponsor1Name] = useState('');
   const [sponsor2Name, setSponsor2Name] = useState('');
@@ -209,13 +218,40 @@ export function SacramentsPage() {
 
   useEffect(() => {
     if (selectedIsConfirmation) {
-      setSponsor1Name('N/A');
-      setSponsor2Name('N/A');
+      setSponsor1Name((current) => current || 'N/A');
+      setSponsor2Name((current) => current || 'N/A');
     } else {
       setSponsor1Name((current) => (current === 'N/A' ? '' : current));
       setSponsor2Name((current) => (current === 'N/A' ? '' : current));
     }
   }, [selectedIsConfirmation]);
+
+  const handleSelectParishioner = (member: Member) => {
+    setSelectedParishioner(toSelectedParishioner(member));
+    setEditingRecord(null);
+    setSuccessMessage('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingRecord(null);
+    setSponsor1Name(selectedIsConfirmation ? 'N/A' : '');
+    setSponsor2Name(selectedIsConfirmation ? 'N/A' : '');
+    setSuccessMessage('');
+  };
+
+  const handleStartEditRecord = (record: Sacrament) => {
+    setEditingRecord(record);
+    setSelectedRecord(null);
+    setSelectedParishioner(toSelectedParishionerFromRecord(record));
+    setSelectedTypeId(String(record.sacramentTypeId));
+    setSponsor1Name(record.sponsor1Name ?? '');
+    setSponsor2Name(record.sponsor2Name ?? '');
+    setErrorMessage('');
+    setSuccessMessage('Mode modification active. Corrigez l acte puis cliquez Mettre a jour.');
+    window.setTimeout(() => {
+      document.getElementById('sacrament-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -247,29 +283,39 @@ export function SacramentsPage() {
       return;
     }
 
+    const payload: UpdateSacramentPayload = {
+      sacramentTypeId,
+      certificateNumber,
+      sacramentDate,
+      place: getNullableText(formData, 'place'),
+      officiant: getNullableText(formData, 'officiant'),
+      sponsor1Name: sponsor1,
+      sponsor2Name: sponsor2,
+      notes: getNullableText(formData, 'notes'),
+    };
+
     try {
       setIsSaving(true);
       setErrorMessage('');
       setSuccessMessage('');
 
-      await createSacrament({
-        memberId: selectedParishioner.id,
-        sacramentTypeId,
-        certificateNumber,
-        sacramentDate,
-        place: getNullableText(formData, 'place'),
-        officiant: getNullableText(formData, 'officiant'),
-        sponsor1Name: sponsor1,
-        sponsor2Name: sponsor2,
-        notes: getNullableText(formData, 'notes'),
-      });
+      if (editingRecord) {
+        await updateSacrament(editingRecord.id, payload);
+        setSuccessMessage('Acte de sacrement mis a jour avec succes.');
+      } else {
+        await createSacrament({
+          memberId: selectedParishioner.id,
+          ...payload,
+        });
+        setSuccessMessage('Acte de sacrement enregistre avec succes.');
+      }
 
       event.currentTarget.reset();
+      setEditingRecord(null);
       setSelectedTypeId(String(sacramentTypeId));
       setSponsor1Name(selectedIsConfirmation ? 'N/A' : '');
       setSponsor2Name(selectedIsConfirmation ? 'N/A' : '');
       setRefreshRecordsKey((current) => current + 1);
-      setSuccessMessage('Acte de sacrement enregistre avec succes.');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Impossible d enregistrer le sacrement.');
     } finally {
@@ -340,7 +386,7 @@ export function SacramentsPage() {
                   return (
                     <tr
                       key={member.id}
-                      onClick={() => setSelectedParishioner(toSelectedParishioner(member))}
+                      onClick={() => handleSelectParishioner(member)}
                       className={`cursor-pointer transition ${isSelected ? 'bg-[#F4E8C8]' : 'bg-white hover:bg-[#FFF9EE]'}`}
                     >
                       <td className="px-3 py-3 font-bold text-[#0F3D2E]">{member.memberCode}</td>
@@ -362,21 +408,42 @@ export function SacramentsPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+        <form
+          id="sacrament-form"
+          key={editingRecord?.id ?? selectedParishioner?.id ?? 'create'}
+          onSubmit={handleSubmit}
+          className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm"
+        >
           <div className="mb-5 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Paroissien selectionne</p>
-            {selectedParishioner ? (
-              <div className="mt-1">
-                <p className="font-serif text-xl font-bold text-[#0F3D2E]">{selectedParishioner.fullName}</p>
-                <p className="text-sm font-semibold text-[#667085]">
-                  {selectedParishioner.memberCode} - Naissance: {formatDate(selectedParishioner.dateOfBirth)}
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">
+                  {editingRecord ? 'Mode modification' : 'Paroissien selectionne'}
                 </p>
+                {selectedParishioner ? (
+                  <div className="mt-1">
+                    <p className="font-serif text-xl font-bold text-[#0F3D2E]">{selectedParishioner.fullName}</p>
+                    <p className="text-sm font-semibold text-[#667085]">
+                      {selectedParishioner.memberCode} - Naissance: {formatDate(selectedParishioner.dateOfBirth)}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm font-semibold text-[#667085]">
+                    Selectionnez un paroissien a gauche avant d enregistrer un sacrement.
+                  </p>
+                )}
               </div>
-            ) : (
-              <p className="mt-2 text-sm font-semibold text-[#667085]">
-                Selectionnez un paroissien a gauche avant d enregistrer un sacrement.
-              </p>
-            )}
+
+              {editingRecord && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="rounded-lg border border-[#D8C8A2] bg-white px-3 py-2 text-xs font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]"
+                >
+                  Annuler modification
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -398,19 +465,33 @@ export function SacramentsPage() {
             </label>
             <label className={labelClass}>
               <span className={labelTextClass}>Numero certificat</span>
-              <input name="certificateNumber" className={inputClass} placeholder="CERT-0001" disabled={isSaving} required />
+              <input
+                name="certificateNumber"
+                className={inputClass}
+                placeholder="CERT-0001"
+                defaultValue={editingRecord?.certificateNumber ?? ''}
+                disabled={isSaving}
+                required
+              />
             </label>
             <label className={labelClass}>
               <span className={labelTextClass}>Date</span>
-              <input name="sacramentDate" type="date" className={inputClass} disabled={isSaving} required />
+              <input
+                name="sacramentDate"
+                type="date"
+                className={inputClass}
+                defaultValue={formatDate(editingRecord?.sacramentDate).replace('-', '') ? formatDate(editingRecord?.sacramentDate) : ''}
+                disabled={isSaving}
+                required
+              />
             </label>
             <label className={labelClass}>
               <span className={labelTextClass}>Lieu</span>
-              <input name="place" className={inputClass} defaultValue="Paroisse" disabled={isSaving} />
+              <input name="place" className={inputClass} defaultValue={editingRecord?.place ?? 'Paroisse'} disabled={isSaving} />
             </label>
             <label className={labelClass}>
               <span className={labelTextClass}>Officiant</span>
-              <input name="officiant" className={inputClass} disabled={isSaving} />
+              <input name="officiant" className={inputClass} defaultValue={editingRecord?.officiant ?? ''} disabled={isSaving} />
             </label>
             <label className={labelClass}>
               <span className={labelTextClass}>Sponsor 1 / Parrain</span>
@@ -440,6 +521,7 @@ export function SacramentsPage() {
               <span className={labelTextClass}>Notes</span>
               <textarea
                 name="notes"
+                defaultValue={editingRecord?.notes ?? ''}
                 className="min-h-20 w-full rounded-lg border border-[#D9CFB8] bg-[#FFFDF8] px-3 py-2 text-sm outline-none focus:border-[#D4AF37]"
                 disabled={isSaving}
               />
@@ -456,7 +538,7 @@ export function SacramentsPage() {
               disabled={isSaving || !selectedParishioner}
               className="rounded-xl bg-[#0F3D2E] px-5 py-2.5 font-semibold text-white hover:bg-[#145C43] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSaving ? 'Enregistrement...' : 'Enregistrer le sacrement'}
+              {isSaving ? 'Enregistrement...' : editingRecord ? 'Mettre a jour l acte' : 'Enregistrer le sacrement'}
             </button>
           </div>
         </form>
@@ -570,12 +652,18 @@ export function SacramentsPage() {
             </div>
 
             <div className="mt-5 grid gap-2">
-              <button type="button" className="rounded-xl border border-[#D8C8A2] px-4 py-2.5 font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">
-                Modifier
-              </button>
-              <button type="button" className="rounded-xl border border-[#D8C8A2] px-4 py-2.5 font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">
-                Apercu certificat
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleStartEditRecord(selectedRecord)}
+                  className="rounded-xl border border-[#D8C8A2] px-4 py-2.5 font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]"
+                >
+                  Modifier
+                </button>
+                <button type="button" className="rounded-xl border border-[#D8C8A2] px-4 py-2.5 font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">
+                  Apercu certificat
+                </button>
+              </div>
               <button type="button" className="rounded-xl bg-[#0F3D2E] px-4 py-2.5 font-bold text-white hover:bg-[#145C43]">
                 Exporter PDF
               </button>
