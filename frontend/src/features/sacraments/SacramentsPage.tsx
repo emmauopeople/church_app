@@ -283,13 +283,12 @@ export function SacramentsPage() {
 
     const formData = new FormData(formElement);
     const sacramentTypeId = Number(getText(formData, 'sacramentTypeId'));
-    const certificateNumber = getText(formData, 'certificateNumber');
     const sacramentDate = getText(formData, 'sacramentDate');
     const sponsor1 = getText(formData, 'sponsor1Name');
     const sponsor2 = getText(formData, 'sponsor2Name');
 
-    if (!sacramentTypeId || !certificateNumber || !sacramentDate) {
-      setErrorMessage('Le type de sacrement, le numero de certificat et la date sont obligatoires.');
+    if (!sacramentTypeId || !sacramentDate) {
+      setErrorMessage('Le type de sacrement et la date sont obligatoires.');
       return;
     }
 
@@ -308,33 +307,38 @@ export function SacramentsPage() {
       return;
     }
 
-    const payload: UpdateSacramentPayload = {
-      sacramentTypeId,
-      certificateNumber,
-      sacramentDate,
-      place: getNullableText(formData, 'place'),
-      officiant: getNullableText(formData, 'officiant'),
-      sponsor1Name: sponsor1,
-      sponsor2Name: sponsor2,
-      notes: getNullableText(formData, 'notes'),
-    };
-
     try {
       setIsSaving(true);
       setErrorMessage('');
       setSuccessMessage('');
 
       if (editingRecord) {
+        const payload: UpdateSacramentPayload = {
+          certificateNumber: editingRecord.certificateNumber,
+          sacramentTypeId,
+          sacramentDate,
+          place: getNullableText(formData, 'place'),
+          officiant: getNullableText(formData, 'officiant'),
+          sponsor1Name: sponsor1,
+          sponsor2Name: sponsor2,
+          notes: getNullableText(formData, 'notes'),
+        };
         const response = await updateSacrament(editingRecord.id, payload);
         setRecords((current) => current.map((record) => (record.id === response.data.id ? response.data : record)));
         setSuccessMessage('Acte de sacrement mis a jour avec succes.');
       } else {
         const response = await createSacrament({
           memberId: selectedParishioner.id,
-          ...payload,
+          sacramentTypeId,
+          sacramentDate,
+          place: getNullableText(formData, 'place'),
+          officiant: getNullableText(formData, 'officiant'),
+          sponsor1Name: sponsor1,
+          sponsor2Name: sponsor2,
+          notes: getNullableText(formData, 'notes'),
         });
         setRecords((current) => [response.data, ...current]);
-        setSuccessMessage('Acte de sacrement enregistre avec succes.');
+        setSuccessMessage(`Acte de sacrement enregistre avec succes. Numero certificat: ${response.data.certificateNumber}.`);
       }
 
       formElement.reset();
@@ -453,6 +457,9 @@ export function SacramentsPage() {
                     <p className="text-sm font-semibold text-[#667085]">
                       {selectedParishioner.memberCode} - Naissance: {formatDate(selectedParishioner.dateOfBirth)}
                     </p>
+                    {editingRecord && (
+                      <p className="mt-1 text-sm font-bold text-[#9D7A1E]">Certificat: {editingRecord.certificateNumber}</p>
+                    )}
                   </div>
                 ) : (
                   <p className="mt-2 text-sm font-semibold text-[#667085]">
@@ -489,17 +496,6 @@ export function SacramentsPage() {
                   <option key={type.id} value={type.id}>{type.name}</option>
                 ))}
               </select>
-            </label>
-            <label className={labelClass}>
-              <span className={labelTextClass}>Numero certificat</span>
-              <input
-                name="certificateNumber"
-                className={inputClass}
-                placeholder="CERT-0001"
-                defaultValue={editingRecord?.certificateNumber ?? ''}
-                disabled={isSaving}
-                required
-              />
             </label>
             <label className={labelClass}>
               <span className={labelTextClass}>Date</span>
@@ -556,7 +552,7 @@ export function SacramentsPage() {
           </div>
 
           <p className="mt-3 text-xs font-semibold text-[#667085]">
-            Sponsor 1 et Sponsor 2 sont obligatoires. Pour la confirmation, utilisez N/A si non applicable.
+            Le numero de certificat est genere automatiquement par le systeme. Sponsor 1 et Sponsor 2 sont obligatoires; pour la confirmation, utilisez N/A si non applicable.
           </p>
 
           {hasDuplicateSacrament && (
