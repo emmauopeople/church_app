@@ -36,6 +36,6 @@ export type UpdateSacramentPayload = {
   notes?: string | null;
 };
 
-export type CreateSacramentPayload = UpdateSacramentPayload & {
+export type CreateSacramentPayload = Omit<UpdateSacramentPayload, 'certificateNumber'> & {
   memberId: string;
 };
