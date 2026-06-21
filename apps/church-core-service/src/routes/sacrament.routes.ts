@@ -8,7 +8,7 @@ import { updateSacramentForChurch } from "../repositories/sacrament-update.repos
 
 const createSacramentSchema = z.object({
   memberId: z.string().uuid(),
-  certificateNumber: z.string().min(2),
+  certificateNumber: z.string().min(2).optional(),
   sacramentTypeId: z.coerce.number().int().positive(),
   sacramentDate: z.string().min(10),
   place: z.string().optional().nullable(),
@@ -18,7 +18,9 @@ const createSacramentSchema = z.object({
   notes: z.string().optional().nullable()
 });
 
-const updateSacramentSchema = createSacramentSchema.omit({ memberId: true });
+const updateSacramentSchema = createSacramentSchema.omit({ memberId: true }).extend({
+  certificateNumber: z.string().min(2)
+});
 
 const listSacramentsQuerySchema = z.object({
   sacramentTypeId: z.coerce.number().int().positive().optional(),
@@ -58,6 +60,12 @@ function formatSacrament(sacrament: any) {
 }
 
 function handleSacramentWriteError(error: any, reply: FastifyReply) {
+  if (error?.code === "DUPLICATE_MEMBER_SACRAMENT") {
+    return reply.status(409).send({
+      message: "This parishioner already has this sacrament type recorded"
+    });
+  }
+
   if (error?.code === "23505") {
     if (error?.constraint === "idx_sacraments_one_type_per_member") {
       return reply.status(409).send({
