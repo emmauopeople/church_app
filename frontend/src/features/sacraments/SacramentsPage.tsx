@@ -108,6 +108,20 @@ export function SacramentsPage() {
   const selectedSacramentType = sacramentTypes.find((type) => String(type.id) === selectedTypeId);
   const selectedIsConfirmation = isConfirmationType(selectedSacramentType);
 
+  const duplicateSacramentRecord = useMemo(() => {
+    if (!selectedParishioner || !selectedTypeId) {
+      return null;
+    }
+
+    return records.find((record) => (
+      record.memberId === selectedParishioner.id &&
+      String(record.sacramentTypeId) === selectedTypeId &&
+      record.id !== editingRecord?.id
+    )) ?? null;
+  }, [editingRecord?.id, records, selectedParishioner, selectedTypeId]);
+
+  const hasDuplicateSacrament = Boolean(duplicateSacramentRecord);
+
   const filteredRecords = useMemo(() => {
     const search = recordSearchTerm.trim().toLowerCase();
 
@@ -256,12 +270,18 @@ export function SacramentsPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    if (isSaving) {
+      return;
+    }
+
+    const formElement = event.currentTarget;
+
     if (!selectedParishioner) {
       setErrorMessage('Selectionnez d abord un paroissien dans la liste.');
       return;
     }
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(formElement);
     const sacramentTypeId = Number(getText(formData, 'sacramentTypeId'));
     const certificateNumber = getText(formData, 'certificateNumber');
     const sacramentDate = getText(formData, 'sacramentDate');
@@ -270,6 +290,11 @@ export function SacramentsPage() {
 
     if (!sacramentTypeId || !certificateNumber || !sacramentDate) {
       setErrorMessage('Le type de sacrement, le numero de certificat et la date sont obligatoires.');
+      return;
+    }
+
+    if (hasDuplicateSacrament) {
+      setErrorMessage('Ce paroissien a deja ce type de sacrement. Ouvrez l acte existant pour le modifier.');
       return;
     }
 
@@ -300,17 +325,19 @@ export function SacramentsPage() {
       setSuccessMessage('');
 
       if (editingRecord) {
-        await updateSacrament(editingRecord.id, payload);
+        const response = await updateSacrament(editingRecord.id, payload);
+        setRecords((current) => current.map((record) => (record.id === response.data.id ? response.data : record)));
         setSuccessMessage('Acte de sacrement mis a jour avec succes.');
       } else {
-        await createSacrament({
+        const response = await createSacrament({
           memberId: selectedParishioner.id,
           ...payload,
         });
+        setRecords((current) => [response.data, ...current]);
         setSuccessMessage('Acte de sacrement enregistre avec succes.');
       }
 
-      event.currentTarget.reset();
+      formElement.reset();
       setEditingRecord(null);
       setSelectedTypeId(String(sacramentTypeId));
       setSponsor1Name(selectedIsConfirmation ? 'N/A' : '');
@@ -532,10 +559,16 @@ export function SacramentsPage() {
             Sponsor 1 et Sponsor 2 sont obligatoires. Pour la confirmation, utilisez N/A si non applicable.
           </p>
 
+          {hasDuplicateSacrament && (
+            <p className="mt-3 rounded-xl border border-[#F4C7C7] bg-[#FFF5F5] p-3 text-sm font-semibold text-[#8A1F1F]">
+              Ce paroissien a deja ce type de sacrement. Selectionnez l acte existant dans le tableau pour le modifier.
+            </p>
+          )}
+
           <div className="mt-5 flex justify-end">
             <button
               type="submit"
-              disabled={isSaving || !selectedParishioner}
+              disabled={isSaving || !selectedParishioner || hasDuplicateSacrament}
               className="rounded-xl bg-[#0F3D2E] px-5 py-2.5 font-semibold text-white hover:bg-[#145C43] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSaving ? 'Enregistrement...' : editingRecord ? 'Mettre a jour l acte' : 'Enregistrer le sacrement'}
