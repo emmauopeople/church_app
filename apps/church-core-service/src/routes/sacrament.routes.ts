@@ -59,6 +59,12 @@ function formatSacrament(sacrament: any) {
 
 function handleSacramentWriteError(error: any, reply: FastifyReply) {
   if (error?.code === "23505") {
+    if (error?.constraint === "idx_sacraments_one_type_per_member") {
+      return reply.status(409).send({
+        message: "This parishioner already has this sacrament type recorded"
+      });
+    }
+
     return reply.status(409).send({
       message: "A sacrament record with this certificate number already exists"
     });
