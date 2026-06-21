@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireAuth } from "../middlewares/auth.js";
 import { createSacrament } from "../repositories/sacrament-create.repository.js";
 import { listSacramentsByChurch } from "../repositories/sacrament-list.repository.js";
+import { updateSacramentForChurch } from "../repositories/sacrament-update.repository.js";
 
 const createSacramentSchema = z.object({
   memberId: z.string().uuid(),
@@ -17,6 +18,8 @@ const createSacramentSchema = z.object({
   notes: z.string().optional().nullable()
 });
 
+const updateSacramentSchema = createSacramentSchema.omit({ memberId: true });
+
 const listSacramentsQuerySchema = z.object({
   sacramentTypeId: z.coerce.number().int().positive().optional(),
   page: z.coerce.number().int().positive().default(1),
@@ -24,6 +27,10 @@ const listSacramentsQuerySchema = z.object({
 });
 
 const memberSacramentParamsSchema = z.object({
+  id: z.string().uuid()
+});
+
+const sacramentParamsSchema = z.object({
   id: z.string().uuid()
 });
 
@@ -48,6 +55,22 @@ function formatSacrament(sacrament: any) {
     createdAt: sacrament.created_at,
     updatedAt: sacrament.updated_at
   };
+}
+
+function handleSacramentWriteError(error: any, reply: FastifyReply) {
+  if (error?.code === "23505") {
+    return reply.status(409).send({
+      message: "A sacrament record with this certificate number already exists"
+    });
+  }
+
+  if (error?.code === "23503") {
+    return reply.status(400).send({
+      message: "Invalid sacrament type"
+    });
+  }
+
+  throw error;
 }
 
 export async function sacramentRoutes(app: FastifyInstance) {
@@ -167,19 +190,54 @@ export async function sacramentRoutes(app: FastifyInstance) {
         data: formatSacrament(sacrament)
       });
     } catch (error: any) {
-      if (error?.code === "23505") {
-        return reply.status(409).send({
-          message: "A sacrament record with this certificate number already exists"
+      return handleSacramentWriteError(error, reply);
+    }
+  });
+
+  app.put("/core/sacraments/:id", async (request: FastifyRequest, reply: FastifyReply) => {
+    const authUser = requireAuth(request, reply);
+
+    if (!authUser) {
+      return;
+    }
+
+    const paramsParsed = sacramentParamsSchema.safeParse(request.params);
+
+    if (!paramsParsed.success) {
+      return reply.status(400).send({
+        message: "Invalid sacrament id",
+        errors: paramsParsed.error.flatten().fieldErrors
+      });
+    }
+
+    const bodyParsed = updateSacramentSchema.safeParse(request.body);
+
+    if (!bodyParsed.success) {
+      return reply.status(400).send({
+        message: "Invalid sacrament update request",
+        errors: bodyParsed.error.flatten().fieldErrors
+      });
+    }
+
+    try {
+      const sacrament = await updateSacramentForChurch({
+        sacramentId: paramsParsed.data.id,
+        churchId: authUser.churchId,
+        ...bodyParsed.data
+      });
+
+      if (!sacrament) {
+        return reply.status(404).send({
+          message: "Sacrament record not found"
         });
       }
 
-      if (error?.code === "23503") {
-        return reply.status(400).send({
-          message: "Invalid sacrament type"
-        });
-      }
-
-      throw error;
+      return reply.send({
+        message: "Sacrament record updated successfully",
+        data: formatSacrament(sacrament)
+      });
+    } catch (error: any) {
+      return handleSacramentWriteError(error, reply);
     }
   });
 }
