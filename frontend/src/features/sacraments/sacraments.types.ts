@@ -25,8 +25,7 @@ export type Sacrament = {
   updatedAt?: string;
 };
 
-export type CreateSacramentPayload = {
-  memberId: string;
+export type UpdateSacramentPayload = {
   certificateNumber: string;
   sacramentTypeId: number;
   sacramentDate: string;
@@ -35,4 +34,8 @@ export type CreateSacramentPayload = {
   sponsor1Name: string;
   sponsor2Name: string;
   notes?: string | null;
+};
+
+export type CreateSacramentPayload = UpdateSacramentPayload & {
+  memberId: string;
 };
