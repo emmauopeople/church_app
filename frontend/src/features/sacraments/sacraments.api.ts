@@ -1,6 +1,6 @@
 import { config } from '../../lib/config';
 import { getAccessToken } from '../auth/auth.storage';
-import type { CreateSacramentPayload, Sacrament, SacramentType } from './sacraments.types';
+import type { CreateSacramentPayload, Sacrament, SacramentType, UpdateSacramentPayload } from './sacraments.types';
 
 type ListSacramentTypesResponse = {
   data: SacramentType[];
@@ -15,7 +15,7 @@ type ListSacramentsResponse = {
   };
 };
 
-type CreateSacramentResponse = {
+type SacramentWriteResponse = {
   message: string;
   data: Sacrament;
 };
@@ -83,5 +83,15 @@ export async function createSacrament(payload: CreateSacramentPayload) {
     body: JSON.stringify(payload),
   });
 
-  return parseResponse<CreateSacramentResponse>(response);
+  return parseResponse<SacramentWriteResponse>(response);
+}
+
+export async function updateSacrament(sacramentId: string, payload: UpdateSacramentPayload) {
+  const response = await fetch(`${config.churchCoreApiUrl}/core/sacraments/${sacramentId}`, {
+    method: 'PUT',
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<SacramentWriteResponse>(response);
 }
