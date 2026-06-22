@@ -76,23 +76,32 @@ const certificateTemplate = `<!DOCTYPE html>
   <style>
     @page {
       size: {{pageSize}};
-      margin: 10mm;
+      margin: 0;
     }
 
     * {
       box-sizing: border-box;
     }
 
+    html,
     body {
+      width: 100%;
+      height: 100%;
       margin: 0;
+      overflow: hidden;
+    }
+
+    body {
       color: #1f2933;
       background: #ffffff;
       font-family: Georgia, "Times New Roman", serif;
     }
 
     .certificate-page {
-      min-height: 100vh;
-      padding: 10mm;
+      width: 100vw;
+      height: 100vh;
+      padding: 7mm;
+      overflow: hidden;
       background:
         radial-gradient(circle at top left, rgba(212, 175, 55, 0.18), transparent 28%),
         radial-gradient(circle at bottom right, rgba(15, 61, 46, 0.12), transparent 30%),
@@ -101,9 +110,10 @@ const certificateTemplate = `<!DOCTYPE html>
 
     .certificate-shell {
       position: relative;
-      min-height: calc(100vh - 20mm);
+      width: 100%;
+      height: 100%;
       border: 3px solid #0f3d2e;
-      padding: 9mm;
+      padding: 7mm;
       background: #fffdf8;
       overflow: hidden;
     }
@@ -111,7 +121,7 @@ const certificateTemplate = `<!DOCTYPE html>
     .certificate-shell::before {
       content: "";
       position: absolute;
-      inset: 4mm;
+      inset: 3.5mm;
       border: 1.5px solid #d4af37;
       pointer-events: none;
     }
@@ -122,7 +132,7 @@ const certificateTemplate = `<!DOCTYPE html>
       left: 50%;
       top: 52%;
       transform: translate(-50%, -50%);
-      font-size: 120px;
+      font-size: 104px;
       font-weight: 700;
       color: rgba(15, 61, 46, 0.055);
       letter-spacing: 12px;
@@ -132,7 +142,7 @@ const certificateTemplate = `<!DOCTYPE html>
     .content {
       position: relative;
       z-index: 2;
-      min-height: calc(100vh - 38mm);
+      height: 100%;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -146,48 +156,48 @@ const certificateTemplate = `<!DOCTYPE html>
 
     .diocese {
       color: #9d7a1e;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
     }
 
     .church-name {
-      margin-top: 4px;
+      margin-top: 3px;
       color: #0f3d2e;
-      font-size: 25px;
+      font-size: 22px;
       font-weight: 700;
     }
 
     .church-address {
-      margin-top: 4px;
+      margin-top: 3px;
       color: #667085;
-      font-size: 11px;
+      font-size: 10px;
       font-family: Arial, sans-serif;
       text-transform: none;
       letter-spacing: 0;
     }
 
     .title-block {
-      margin-top: 8mm;
+      margin-top: 5mm;
       text-align: center;
     }
 
     .document-title {
       margin: 0;
       color: #0f3d2e;
-      font-size: 34px;
-      line-height: 1.1;
+      font-size: 29px;
+      line-height: 1.05;
       text-transform: uppercase;
       letter-spacing: 2px;
     }
 
     .document-subtitle {
       display: inline-block;
-      margin-top: 8px;
-      padding: 4px 22px;
+      margin-top: 6px;
+      padding: 3px 18px;
       border-top: 1px solid #d4af37;
       border-bottom: 1px solid #d4af37;
       color: #9d7a1e;
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 1px;
@@ -195,69 +205,70 @@ const certificateTemplate = `<!DOCTYPE html>
 
     .body-text {
       max-width: 820px;
-      margin: 9mm auto 0;
+      margin: 5mm auto 0;
       text-align: center;
-      font-size: 17px;
-      line-height: 1.75;
+      font-size: 15px;
+      line-height: 1.45;
     }
 
     .member-name {
       display: inline-block;
-      margin: 5mm 0 4mm;
-      padding: 0 16mm 2mm;
+      margin: 3mm 0 2.5mm;
+      padding: 0 14mm 1.5mm;
       border-bottom: 2px solid #d4af37;
       color: #0f3d2e;
-      font-size: 30px;
+      font-size: 25px;
       font-weight: 700;
-      line-height: 1.1;
+      line-height: 1.05;
     }
 
     .details-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 7px 18px;
-      max-width: 820px;
-      margin: 7mm auto 0;
+      gap: 4px 14px;
+      max-width: 840px;
+      margin: 5mm auto 0;
       text-align: left;
-      font-size: 13px;
+      font-size: 11px;
       font-family: Arial, sans-serif;
     }
 
     .detail-row {
       display: grid;
-      grid-template-columns: 135px minmax(0, 1fr);
-      gap: 8px;
+      grid-template-columns: 118px minmax(0, 1fr);
+      gap: 7px;
       border-bottom: 1px dotted #d8c8a2;
-      padding-bottom: 4px;
+      padding-bottom: 2px;
     }
 
     .label {
       color: #9d7a1e;
       font-weight: 700;
       text-transform: uppercase;
-      font-size: 10px;
-      letter-spacing: 0.4px;
+      font-size: 8.5px;
+      letter-spacing: 0.35px;
     }
 
     .value {
       color: #1f2933;
       font-weight: 700;
+      overflow-wrap: anywhere;
     }
 
     .signature-row {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 15mm;
-      margin-top: 12mm;
-      padding: 0 12mm;
+      gap: 13mm;
+      margin-top: 7mm;
+      padding: 0 10mm;
       text-align: center;
       font-family: Arial, sans-serif;
-      font-size: 11px;
+      font-size: 10px;
     }
 
     .signature-line {
       border-top: 1px solid #1f2933;
-      padding-top: 6px;
+      padding-top: 5px;
       font-weight: 700;
       color: #0f3d2e;
     }
@@ -266,10 +277,10 @@ const certificateTemplate = `<!DOCTYPE html>
       display: flex;
       justify-content: space-between;
       gap: 12px;
-      margin-top: 7mm;
+      margin-top: 4mm;
       color: #667085;
       font-family: Arial, sans-serif;
-      font-size: 10px;
+      font-size: 9px;
     }
 
     .certificate-number {
