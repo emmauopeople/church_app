@@ -1,15 +1,41 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { CatholicIcon, type CatholicIconName } from '../../components/decorative/CatholicIcon';
+import { listMembers } from '../members/members.api';
+import type { Member, MemberStatus } from '../members/members.types';
 import { listSacraments, listSacramentTypes } from '../sacraments/sacraments.api';
 import type { Sacrament, SacramentType } from '../sacraments/sacraments.types';
 
 const filterInputClass = 'h-11 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4 text-sm font-semibold text-[#344054] outline-none focus:border-[#D4AF37]';
 
+type RegisterMode = 'sacraments' | 'christians';
+type AgeGroupKey = 'ALL' | 'CHILDREN' | 'YOUTHS' | 'YOUNG_ADULTS' | 'ADULTS' | 'OLDER_ADULTS' | 'UNKNOWN';
+type MemberStatusFilter = 'ALL' | MemberStatus;
+
 type RegisterStatistic = {
   label: string;
   count: number;
   color: string;
+};
+
+const ageGroupDefinitions: Array<{
+  key: AgeGroupKey;
+  label: string;
+  range: string;
+  color: string;
+}> = [
+  { key: 'CHILDREN', label: 'Enfants', range: '0 - 12 ans', color: '#0EA5E9' },
+  { key: 'YOUTHS', label: 'Jeunes', range: '13 - 17 ans', color: '#7C3AED' },
+  { key: 'YOUNG_ADULTS', label: 'Jeunes adultes', range: '18 - 35 ans', color: '#16A34A' },
+  { key: 'ADULTS', label: 'Adultes', range: '36 - 59 ans', color: '#D97706' },
+  { key: 'OLDER_ADULTS', label: 'Aines', range: '60 ans et plus', color: '#B91C1C' },
+];
+
+const statusLabels: Record<MemberStatusFilter, string> = {
+  ALL: 'Tous les statuts',
+  ACTIVE: 'Actif',
+  INACTIVE: 'Inactif',
+  DECEASED: 'Decede',
 };
 
 function getDateOnly(value?: string | null) {
@@ -59,6 +85,25 @@ function getSearchableRecordText(record: Sacrament) {
     .toLowerCase();
 }
 
+function getSearchableMemberText(member: Member) {
+  return [
+    member.firstName,
+    member.lastName,
+    member.middleName,
+    member.memberCode,
+    member.phone,
+    member.email,
+    member.city,
+    member.country,
+    member.address,
+    member.fatherName,
+    member.motherName,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
 function getSacramentIcon(type?: SacramentType): CatholicIconName {
   const value = `${type?.code ?? ''} ${type?.name ?? ''}`.toLowerCase();
 
@@ -99,6 +144,94 @@ function isRecordWithinDateRange(record: Sacrament, startDate: string, endDate: 
   return true;
 }
 
+function getAge(dateOfBirth?: string | null) {
+  const dateOnly = getDateOnly(dateOfBirth);
+
+  if (!dateOnly) {
+    return null;
+  }
+
+  const birthDate = new Date(`${dateOnly}T00:00:00`);
+
+  if (Number.isNaN(birthDate.getTime())) {
+    return null;
+  }
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDifference = today.getMonth() - birthDate.getMonth();
+
+  if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age : null;
+}
+
+function getMemberAgeGroup(member: Member): AgeGroupKey {
+  const age = getAge(member.dateOfBirth);
+
+  if (age === null) {
+    return 'UNKNOWN';
+  }
+
+  if (age <= 12) {
+    return 'CHILDREN';
+  }
+
+  if (age <= 17) {
+    return 'YOUTHS';
+  }
+
+  if (age <= 35) {
+    return 'YOUNG_ADULTS';
+  }
+
+  if (age <= 59) {
+    return 'ADULTS';
+  }
+
+  return 'OLDER_ADULTS';
+}
+
+function getAgeGroupLabel(groupKey: AgeGroupKey) {
+  if (groupKey === 'ALL') {
+    return 'Tous les groupes';
+  }
+
+  if (groupKey === 'UNKNOWN') {
+    return 'Age non renseigne';
+  }
+
+  return ageGroupDefinitions.find((group) => group.key === groupKey)?.label ?? 'Groupe inconnu';
+}
+
+function getMemberPeriodDate(member: Member) {
+  return getDateOnly(member.createdAt) || '';
+}
+
+function isMemberWithinPeriod(member: Member, year: string, startDate: string, endDate: string) {
+  const memberDate = getMemberPeriodDate(member);
+
+  if (!memberDate) {
+    return !year && !startDate && !endDate;
+  }
+
+  if (year.trim() && !memberDate.startsWith(year.trim())) {
+    return false;
+  }
+
+  if (startDate && memberDate < startDate) {
+    return false;
+  }
+
+  if (endDate && memberDate > endDate) {
+    return false;
+  }
+
+  return true;
+}
+
 function buildRegisterFilterText(params: {
   registerName: string;
   startDate: string;
@@ -117,7 +250,29 @@ function buildRegisterFilterText(params: {
   return filters.join(' | ');
 }
 
-function getRegisterStatistics(records: Sacrament[]): RegisterStatistic[] {
+function buildChristianRegisterFilterText(params: {
+  ageGroupName: string;
+  year: string;
+  startDate: string;
+  endDate: string;
+  status: MemberStatusFilter;
+  searchTerm: string;
+  count: number;
+}) {
+  const filters = [
+    `Groupe: ${params.ageGroupName}`,
+    params.year.trim() ? `Annee: ${params.year.trim()}` : '',
+    params.startDate ? `Du: ${formatDate(params.startDate)}` : '',
+    params.endDate ? `Au: ${formatDate(params.endDate)}` : '',
+    `Statut: ${statusLabels[params.status]}`,
+    params.searchTerm.trim() ? `Recherche: ${params.searchTerm.trim()}` : '',
+    `Total: ${params.count} personne${params.count > 1 ? 's' : ''}`,
+  ].filter(Boolean);
+
+  return filters.join(' | ');
+}
+
+function getSacramentStatistics(records: Sacrament[]): RegisterStatistic[] {
   const baptismCount = records.filter((record) => {
     const value = record.sacramentTypeName.toLowerCase();
     return value.includes('bapt') || value.includes('bapteme');
@@ -143,11 +298,22 @@ function getRegisterStatistics(records: Sacrament[]): RegisterStatistic[] {
   ];
 }
 
-function buildStatisticsChartHtml(records: Sacrament[]) {
-  const statistics = getRegisterStatistics(records);
-  const maxCount = Math.max(...statistics.map((statistic) => statistic.count), 1);
-  const totalCount = statistics.reduce((sum, statistic) => sum + statistic.count, 0);
-  const rows = statistics.map((statistic) => {
+function getChristianStatistics(members: Member[]): RegisterStatistic[] {
+  return ageGroupDefinitions.map((group) => ({
+    label: group.label,
+    count: members.filter((member) => getMemberAgeGroup(member) === group.key).length,
+    color: group.color,
+  }));
+}
+
+function buildStatisticsChartHtml(params: {
+  title: string;
+  subtitle: string;
+  statistics: RegisterStatistic[];
+}) {
+  const maxCount = Math.max(...params.statistics.map((statistic) => statistic.count), 1);
+  const totalCount = params.statistics.reduce((sum, statistic) => sum + statistic.count, 0);
+  const rows = params.statistics.map((statistic) => {
     const width = Math.max((statistic.count / maxCount) * 100, statistic.count > 0 ? 8 : 0);
     const percentage = totalCount > 0 ? Math.round((statistic.count / totalCount) * 100) : 0;
 
@@ -169,10 +335,10 @@ function buildStatisticsChartHtml(records: Sacrament[]) {
     <section class="stats-section">
       <div class="stats-header">
         <div>
-          <p>Statistiques des sacrements</p>
-          <h2>Resume par registre</h2>
+          <p>${escapeHtml(params.subtitle)}</p>
+          <h2>${escapeHtml(params.title)}</h2>
         </div>
-        <div class="stats-total">${totalCount} actes</div>
+        <div class="stats-total">${totalCount} total</div>
       </div>
       <div class="chart-box">
         ${rows}
@@ -181,47 +347,8 @@ function buildStatisticsChartHtml(records: Sacrament[]) {
   `;
 }
 
-function buildRegisterPrintDocumentHtml(params: {
-  registerName: string;
-  records: Sacrament[];
-  startDate: string;
-  endDate: string;
-  searchTerm: string;
-  showStatistics: boolean;
-}) {
-  const generatedAt = formatDate(new Date().toISOString());
-  const filterText = buildRegisterFilterText({
-    registerName: params.registerName,
-    startDate: params.startDate,
-    endDate: params.endDate,
-    searchTerm: params.searchTerm,
-    count: params.records.length,
-  });
-  const statisticsHtml = params.showStatistics ? buildStatisticsChartHtml(params.records) : '';
-
-  const rows = params.records.map((record, index) => `
-    <tr>
-      <td>${String(index + 1).padStart(3, '0')}</td>
-      <td>${escapeHtml(formatDate(record.sacramentDate))}</td>
-      <td>
-        <strong>${escapeHtml(`${record.memberFirstName} ${record.memberLastName}`)}</strong>
-        <span>${escapeHtml(record.memberCode)}</span>
-      </td>
-      <td>${escapeHtml(record.sacramentTypeName)}</td>
-      <td>${escapeHtml(record.certificateNumber)}</td>
-      <td>${escapeHtml(record.place || '-')}</td>
-      <td>${escapeHtml(record.officiant || '-')}</td>
-      <td>${escapeHtml(record.sponsor1Name || '-')}<br />${escapeHtml(record.sponsor2Name || '-')}</td>
-      <td>${escapeHtml(record.notes || '-')}</td>
-    </tr>
-  `).join('');
-
-  return `<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <title>${escapeHtml(params.registerName)}</title>
-  <style>
+function getPrintDocumentBaseStyles() {
+  return `
     @page { size: A4 landscape; margin: 10mm; }
     * { box-sizing: border-box; }
     body {
@@ -422,7 +549,56 @@ function buildRegisterPrintDocumentHtml(params: {
       body { background: #ffffff; }
       .page { border: none; padding: 0; }
     }
-  </style>
+  `;
+}
+
+function buildSacramentRegisterPrintDocumentHtml(params: {
+  registerName: string;
+  records: Sacrament[];
+  startDate: string;
+  endDate: string;
+  searchTerm: string;
+  showStatistics: boolean;
+}) {
+  const generatedAt = formatDate(new Date().toISOString());
+  const filterText = buildRegisterFilterText({
+    registerName: params.registerName,
+    startDate: params.startDate,
+    endDate: params.endDate,
+    searchTerm: params.searchTerm,
+    count: params.records.length,
+  });
+  const statisticsHtml = params.showStatistics
+    ? buildStatisticsChartHtml({
+        title: 'Resume par registre',
+        subtitle: 'Statistiques des sacrements',
+        statistics: getSacramentStatistics(params.records),
+      })
+    : '';
+
+  const rows = params.records.map((record, index) => `
+    <tr>
+      <td>${String(index + 1).padStart(3, '0')}</td>
+      <td>${escapeHtml(formatDate(record.sacramentDate))}</td>
+      <td>
+        <strong>${escapeHtml(`${record.memberFirstName} ${record.memberLastName}`)}</strong>
+        <span>${escapeHtml(record.memberCode)}</span>
+      </td>
+      <td>${escapeHtml(record.sacramentTypeName)}</td>
+      <td>${escapeHtml(record.certificateNumber)}</td>
+      <td>${escapeHtml(record.place || '-')}</td>
+      <td>${escapeHtml(record.officiant || '-')}</td>
+      <td>${escapeHtml(record.sponsor1Name || '-')}<br />${escapeHtml(record.sponsor2Name || '-')}</td>
+      <td>${escapeHtml(record.notes || '-')}</td>
+    </tr>
+  `).join('');
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>${escapeHtml(params.registerName)}</title>
+  <style>${getPrintDocumentBaseStyles()}</style>
 </head>
 <body>
   <main class="page">
@@ -467,15 +643,120 @@ function buildRegisterPrintDocumentHtml(params: {
 </html>`;
 }
 
+function buildChristianRegisterPrintDocumentHtml(params: {
+  ageGroupName: string;
+  members: Member[];
+  year: string;
+  startDate: string;
+  endDate: string;
+  status: MemberStatusFilter;
+  searchTerm: string;
+}) {
+  const generatedAt = formatDate(new Date().toISOString());
+  const filterText = buildChristianRegisterFilterText({
+    ageGroupName: params.ageGroupName,
+    year: params.year,
+    startDate: params.startDate,
+    endDate: params.endDate,
+    status: params.status,
+    searchTerm: params.searchTerm,
+    count: params.members.length,
+  });
+  const statisticsHtml = buildStatisticsChartHtml({
+    title: 'Resume par groupe d age',
+    subtitle: 'Statistiques des chretiens',
+    statistics: getChristianStatistics(params.members),
+  });
+
+  const rows = params.members.map((member, index) => {
+    const age = getAge(member.dateOfBirth);
+
+    return `
+      <tr>
+        <td>${String(index + 1).padStart(3, '0')}</td>
+        <td>${escapeHtml(member.memberCode)}</td>
+        <td>
+          <strong>${escapeHtml(`${member.firstName} ${member.lastName}`)}</strong>
+          <span>${escapeHtml(member.middleName || '')}</span>
+        </td>
+        <td>${escapeHtml(age === null ? '-' : age)}</td>
+        <td>${escapeHtml(getAgeGroupLabel(getMemberAgeGroup(member)))}</td>
+        <td>${escapeHtml(member.gender === 'MALE' ? 'M' : member.gender === 'FEMALE' ? 'F' : '-')}</td>
+        <td>${escapeHtml(member.phone || '-')}</td>
+        <td>${escapeHtml(member.city || '-')}</td>
+        <td>${escapeHtml(statusLabels[member.status])}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Registre des chretiens</title>
+  <style>${getPrintDocumentBaseStyles()}</style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div class="mark">IHS</div>
+      <div class="title">
+        <p>Registre paroissial officiel</p>
+        <h1>Registre des chretiens</h1>
+      </div>
+      <div class="mark">+</div>
+    </header>
+    <section class="meta">
+      <span>${escapeHtml(filterText)}</span>
+      <span>Genere le ${escapeHtml(generatedAt)}</span>
+    </section>
+    ${statisticsHtml}
+    ${params.members.length > 0 ? `
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 4%;">No</th>
+            <th style="width: 10%;">Code</th>
+            <th style="width: 20%;">Nom</th>
+            <th style="width: 6%;">Age</th>
+            <th style="width: 14%;">Groupe</th>
+            <th style="width: 6%;">Sexe</th>
+            <th style="width: 14%;">Telephone</th>
+            <th style="width: 13%;">Ville</th>
+            <th style="width: 13%;">Statut</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    ` : '<div class="empty">Aucun chretien trouve pour ces filtres.</div>'}
+    <section class="signature-row">
+      <div class="signature-line">Secretaire paroissial</div>
+      <div class="signature-line">Cure / Responsable</div>
+      <div class="signature-line">Cachet de la paroisse</div>
+    </section>
+  </main>
+</body>
+</html>`;
+}
+
 export function RegistersPage() {
   const printFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const [registerMode, setRegisterMode] = useState<RegisterMode>('sacraments');
   const [sacramentTypes, setSacramentTypes] = useState<SacramentType[]>([]);
   const [records, setRecords] = useState<Sacrament[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [selectedTypeId, setSelectedTypeId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [christianSearchTerm, setChristianSearchTerm] = useState('');
+  const [christianYear, setChristianYear] = useState('');
+  const [christianStartDate, setChristianStartDate] = useState('');
+  const [christianEndDate, setChristianEndDate] = useState('');
+  const [selectedAgeGroup, setSelectedAgeGroup] = useState<AgeGroupKey>('ALL');
+  const [selectedMemberStatus, setSelectedMemberStatus] = useState<MemberStatusFilter>('ALL');
   const [selectedRecord, setSelectedRecord] = useState<Sacrament | null>(null);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [registerPreviewHtml, setRegisterPreviewHtml] = useState('');
   const [isRegisterPreviewOpen, setIsRegisterPreviewOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -487,17 +768,20 @@ export function RegistersPage() {
         setIsLoading(true);
         setErrorMessage('');
 
-        const [typesResponse, recordsResponse] = await Promise.all([
+        const [typesResponse, recordsResponse, membersResponse] = await Promise.all([
           listSacramentTypes(),
           listSacraments({ page: 1, limit: 100 }),
+          listMembers({ page: 1, limit: 500 }),
         ]);
 
         setSacramentTypes(typesResponse.data);
         setRecords(recordsResponse.data);
+        setMembers(membersResponse.data);
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : 'Impossible de charger les registres.');
         setSacramentTypes([]);
         setRecords([]);
+        setMembers([]);
       } finally {
         setIsLoading(false);
       }
@@ -523,21 +807,57 @@ export function RegistersPage() {
       .sort((first, second) => getDateOnly(second.sacramentDate).localeCompare(getDateOnly(first.sacramentDate)));
   }, [endDate, records, searchTerm, selectedTypeId, startDate]);
 
+  const filteredMembers = useMemo(() => {
+    const search = christianSearchTerm.trim().toLowerCase();
+
+    return members
+      .filter((member) => selectedAgeGroup === 'ALL' || getMemberAgeGroup(member) === selectedAgeGroup)
+      .filter((member) => selectedMemberStatus === 'ALL' || member.status === selectedMemberStatus)
+      .filter((member) => isMemberWithinPeriod(member, christianYear, christianStartDate, christianEndDate))
+      .filter((member) => !search || getSearchableMemberText(member).includes(search))
+      .sort((first, second) => `${first.lastName} ${first.firstName}`.localeCompare(`${second.lastName} ${second.firstName}`));
+  }, [christianEndDate, christianSearchTerm, christianStartDate, christianYear, members, selectedAgeGroup, selectedMemberStatus]);
+
   const currentYear = String(new Date().getFullYear());
   const recordsThisYear = records.filter((record) => getDateOnly(record.sacramentDate).startsWith(currentYear)).length;
+  const membersThisYear = members.filter((member) => getMemberPeriodDate(member).startsWith(currentYear)).length;
   const activeRegisterName = selectedTypeId
     ? sacramentTypes.find((type) => String(type.id) === selectedTypeId)?.name ?? 'Registre selectionne'
     : 'Tous les registres';
+  const activeAgeGroupName = getAgeGroupLabel(selectedAgeGroup);
 
-  const handleResetFilters = () => {
+  const handleResetSacramentFilters = () => {
     setSelectedTypeId('');
     setSearchTerm('');
     setStartDate('');
     setEndDate('');
   };
 
+  const handleResetChristianFilters = () => {
+    setSelectedAgeGroup('ALL');
+    setSelectedMemberStatus('ALL');
+    setChristianSearchTerm('');
+    setChristianYear('');
+    setChristianStartDate('');
+    setChristianEndDate('');
+  };
+
   const handleOpenRegisterPreview = () => {
-    setRegisterPreviewHtml(buildRegisterPrintDocumentHtml({
+    if (registerMode === 'christians') {
+      setRegisterPreviewHtml(buildChristianRegisterPrintDocumentHtml({
+        ageGroupName: activeAgeGroupName,
+        members: filteredMembers,
+        year: christianYear,
+        startDate: christianStartDate,
+        endDate: christianEndDate,
+        status: selectedMemberStatus,
+        searchTerm: christianSearchTerm,
+      }));
+      setIsRegisterPreviewOpen(true);
+      return;
+    }
+
+    setRegisterPreviewHtml(buildSacramentRegisterPrintDocumentHtml({
       registerName: activeRegisterName,
       records: filteredRecords,
       startDate,
@@ -569,7 +889,7 @@ export function RegistersPage() {
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Registres officiels</p>
               <h2 className="font-serif text-3xl font-bold text-[#0F3D2E]">Registres paroissiaux</h2>
-              <p className="text-[#667085]">Consultez les registres de bapteme, confirmation, mariage et premiere communion.</p>
+              <p className="text-[#667085]">Consultez les registres sacramentels et le registre des chretiens.</p>
             </div>
           </div>
 
@@ -595,190 +915,428 @@ export function RegistersPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Total actes</p>
-          <p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{records.length}</p>
-          <p className="mt-1 text-sm font-semibold text-[#667085]">Actes charges dans le registre</p>
-        </div>
-        <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Annee courante</p>
-          <p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{recordsThisYear}</p>
-          <p className="mt-1 text-sm font-semibold text-[#667085]">Actes enregistres en {currentYear}</p>
-        </div>
-        <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Affichage actuel</p>
-          <p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{filteredRecords.length}</p>
-          <p className="mt-1 text-sm font-semibold text-[#667085]">Resultats apres filtres</p>
-        </div>
+      <section className="grid gap-3 md:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => setRegisterMode('sacraments')}
+          className={`rounded-2xl border p-5 text-left transition ${registerMode === 'sacraments' ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-white hover:bg-[#FFF9EE]'}`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#0F3D2E]">
+              <CatholicIcon name="chalice" className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-serif text-xl font-bold text-[#0F3D2E]">Registres sacramentels</p>
+              <p className="text-sm font-semibold text-[#667085]">Bapteme, confirmation, mariage, premiere communion</p>
+            </div>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setRegisterMode('christians')}
+          className={`rounded-2xl border p-5 text-left transition ${registerMode === 'christians' ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-white hover:bg-[#FFF9EE]'}`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#0F3D2E]">
+              <CatholicIcon name="people" className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-serif text-xl font-bold text-[#0F3D2E]">Registre des chretiens</p>
+              <p className="text-sm font-semibold text-[#667085]">Enfants, jeunes, jeunes adultes, adultes et aines</p>
+            </div>
+          </div>
+        </button>
       </section>
 
-      <section className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Choisir un registre</p>
-            <h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{activeRegisterName}</h3>
-          </div>
-
-          {isLoading && <span className="text-sm font-semibold text-[#667085]">Chargement des registres...</span>}
-        </div>
-
-        {errorMessage && (
-          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm font-semibold">{errorMessage}</p>
-            <button
-              type="button"
-              onClick={() => setErrorMessage('')}
-              className="self-start rounded-lg border border-current px-4 py-1.5 text-sm font-bold sm:self-auto"
-            >
-              OK
-            </button>
-          </div>
-        )}
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <button
-            type="button"
-            onClick={() => setSelectedTypeId('')}
-            className={`rounded-2xl border p-4 text-left transition ${!selectedTypeId ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#0F3D2E]">
-                <CatholicIcon name="book" className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-[#0F3D2E]">Tous</p>
-                <p className="text-xs font-semibold text-[#667085]">{records.length} actes</p>
-              </div>
+      {registerMode === 'sacraments' && (
+        <>
+          <section className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Total actes</p>
+              <p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{records.length}</p>
+              <p className="mt-1 text-sm font-semibold text-[#667085]">Actes charges dans le registre</p>
             </div>
-          </button>
+            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Annee courante</p>
+              <p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{recordsThisYear}</p>
+              <p className="mt-1 text-sm font-semibold text-[#667085]">Actes enregistres en {currentYear}</p>
+            </div>
+            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Affichage actuel</p>
+              <p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{filteredRecords.length}</p>
+              <p className="mt-1 text-sm font-semibold text-[#667085]">Resultats apres filtres</p>
+            </div>
+          </section>
 
-          {typeCounts.map(({ type, count }) => {
-            const isSelected = selectedTypeId === String(type.id);
+          <section className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Choisir un registre</p>
+                <h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{activeRegisterName}</h3>
+              </div>
 
-            return (
+              {isLoading && <span className="text-sm font-semibold text-[#667085]">Chargement des registres...</span>}
+            </div>
+
+            {errorMessage && (
+              <div className="mt-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-semibold">{errorMessage}</p>
+                <button
+                  type="button"
+                  onClick={() => setErrorMessage('')}
+                  className="self-start rounded-lg border border-current px-4 py-1.5 text-sm font-bold sm:self-auto"
+                >
+                  OK
+                </button>
+              </div>
+            )}
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               <button
                 type="button"
-                key={type.id}
-                onClick={() => setSelectedTypeId(String(type.id))}
-                className={`rounded-2xl border p-4 text-left transition ${isSelected ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}
+                onClick={() => setSelectedTypeId('')}
+                className={`rounded-2xl border p-4 text-left transition ${!selectedTypeId ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#0F3D2E]">
-                    <CatholicIcon name={getSacramentIcon(type)} className="h-5 w-5" />
+                    <CatholicIcon name="book" className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-[#0F3D2E]">{type.name}</p>
-                    <p className="text-xs font-semibold text-[#667085]">{count} actes</p>
+                    <p className="text-sm font-bold text-[#0F3D2E]">Tous</p>
+                    <p className="text-xs font-semibold text-[#667085]">{records.length} actes</p>
                   </div>
                 </div>
               </button>
-            );
-          })}
-        </div>
 
-        <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_190px_190px_auto]">
-          <label className="flex h-11 items-center gap-3 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4">
-            <CatholicIcon name="search" className="h-5 w-5 text-[#9D7A1E]" />
-            <input
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Rechercher nom, code, certificat, officiant, lieu"
-              className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-[#98A2B3]"
-            />
-          </label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
-            className={filterInputClass}
-            aria-label="Date debut"
-          />
-          <input
-            type="date"
-            value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
-            className={filterInputClass}
-            aria-label="Date fin"
-          />
-          <button
-            type="button"
-            onClick={handleResetFilters}
-            className="rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]"
-          >
-            Reinitialiser
-          </button>
-        </div>
-      </section>
+              {typeCounts.map(({ type, count }) => {
+                const isSelected = selectedTypeId === String(type.id);
 
-      <section className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Table du registre</p>
-            <h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{activeRegisterName}</h3>
-          </div>
-          <p className="text-sm font-semibold text-[#667085]">
-            {filteredRecords.length} entree{filteredRecords.length > 1 ? 's' : ''} affichee{filteredRecords.length > 1 ? 's' : ''}
-          </p>
-        </div>
+                return (
+                  <button
+                    type="button"
+                    key={type.id}
+                    onClick={() => setSelectedTypeId(String(type.id))}
+                    className={`rounded-2xl border p-4 text-left transition ${isSelected ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#0F3D2E]">
+                        <CatholicIcon name={getSacramentIcon(type)} className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-[#0F3D2E]">{type.name}</p>
+                        <p className="text-xs font-semibold text-[#667085]">{count} actes</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
 
-        <div className="mt-5 overflow-hidden rounded-xl border border-[#EEE6D6]">
-          <table className="w-full min-w-[1100px] text-left text-sm">
-            <thead className="bg-[#FFF9EE] text-xs uppercase tracking-wide text-[#9D7A1E]">
-              <tr>
-                <th className="px-4 py-3">No</th>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Paroissien</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Certificat</th>
-                <th className="px-4 py-3">Lieu</th>
-                <th className="px-4 py-3">Officiant</th>
-                <th className="px-4 py-3">Parrain / Marraine</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#EEE6D6]">
-              {filteredRecords.map((record, index) => (
-                <tr
-                  key={record.id}
-                  onClick={() => setSelectedRecord(record)}
-                  className="cursor-pointer bg-white transition hover:bg-[#FFF9EE]"
+            <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_190px_190px_auto]">
+              <label className="flex h-11 items-center gap-3 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4">
+                <CatholicIcon name="search" className="h-5 w-5 text-[#9D7A1E]" />
+                <input
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Rechercher nom, code, certificat, officiant, lieu"
+                  className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-[#98A2B3]"
+                />
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className={filterInputClass}
+                aria-label="Date debut"
+              />
+              <input
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+                className={filterInputClass}
+                aria-label="Date fin"
+              />
+              <button
+                type="button"
+                onClick={handleResetSacramentFilters}
+                className="rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]"
+              >
+                Reinitialiser
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Table du registre</p>
+                <h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{activeRegisterName}</h3>
+              </div>
+              <p className="text-sm font-semibold text-[#667085]">
+                {filteredRecords.length} entree{filteredRecords.length > 1 ? 's' : ''} affichee{filteredRecords.length > 1 ? 's' : ''}
+              </p>
+            </div>
+
+            <div className="mt-5 overflow-hidden rounded-xl border border-[#EEE6D6]">
+              <table className="w-full min-w-[1100px] text-left text-sm">
+                <thead className="bg-[#FFF9EE] text-xs uppercase tracking-wide text-[#9D7A1E]">
+                  <tr>
+                    <th className="px-4 py-3">No</th>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Paroissien</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Certificat</th>
+                    <th className="px-4 py-3">Lieu</th>
+                    <th className="px-4 py-3">Officiant</th>
+                    <th className="px-4 py-3">Parrain / Marraine</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EEE6D6]">
+                  {filteredRecords.map((record, index) => (
+                    <tr
+                      key={record.id}
+                      onClick={() => setSelectedRecord(record)}
+                      className="cursor-pointer bg-white transition hover:bg-[#FFF9EE]"
+                    >
+                      <td className="px-4 py-3 font-bold text-[#0F3D2E]">{String(index + 1).padStart(3, '0')}</td>
+                      <td className="px-4 py-3 font-semibold text-[#344054]">{formatDate(record.sacramentDate)}</td>
+                      <td className="px-4 py-3 font-semibold text-[#1F2933]">
+                        {record.memberFirstName} {record.memberLastName}
+                        <span className="block text-xs font-bold text-[#667085]">{record.memberCode}</span>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-[#0F3D2E]">{record.sacramentTypeName}</td>
+                      <td className="px-4 py-3 text-[#667085]">{record.certificateNumber}</td>
+                      <td className="px-4 py-3 text-[#667085]">{record.place || '-'}</td>
+                      <td className="px-4 py-3 text-[#667085]">{record.officiant || '-'}</td>
+                      <td className="px-4 py-3 text-[#667085]">
+                        <span className="block">{record.sponsor1Name || '-'}</span>
+                        <span className="block text-xs">{record.sponsor2Name || '-'}</span>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {!isLoading && filteredRecords.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">
+                        Aucun acte trouve pour ces filtres.
+                      </td>
+                    </tr>
+                  )}
+
+                  {isLoading && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">
+                        Chargement des registres...
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      )}
+
+      {registerMode === 'christians' && (
+        <>
+          <section className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Total chretiens</p>
+              <p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{members.length}</p>
+              <p className="mt-1 text-sm font-semibold text-[#667085]">Paroissiens charges</p>
+            </div>
+            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Inscrits cette annee</p>
+              <p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{membersThisYear}</p>
+              <p className="mt-1 text-sm font-semibold text-[#667085]">Dossiers crees en {currentYear}</p>
+            </div>
+            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Affichage actuel</p>
+              <p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{filteredMembers.length}</p>
+              <p className="mt-1 text-sm font-semibold text-[#667085]">Resultats apres filtres</p>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Registre des chretiens</p>
+                <h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{activeAgeGroupName}</h3>
+              </div>
+
+              {isLoading && <span className="text-sm font-semibold text-[#667085]">Chargement des chretiens...</span>}
+            </div>
+
+            {errorMessage && (
+              <div className="mt-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-semibold">{errorMessage}</p>
+                <button
+                  type="button"
+                  onClick={() => setErrorMessage('')}
+                  className="self-start rounded-lg border border-current px-4 py-1.5 text-sm font-bold sm:self-auto"
                 >
-                  <td className="px-4 py-3 font-bold text-[#0F3D2E]">{String(index + 1).padStart(3, '0')}</td>
-                  <td className="px-4 py-3 font-semibold text-[#344054]">{formatDate(record.sacramentDate)}</td>
-                  <td className="px-4 py-3 font-semibold text-[#1F2933]">
-                    {record.memberFirstName} {record.memberLastName}
-                    <span className="block text-xs font-bold text-[#667085]">{record.memberCode}</span>
-                  </td>
-                  <td className="px-4 py-3 font-bold text-[#0F3D2E]">{record.sacramentTypeName}</td>
-                  <td className="px-4 py-3 text-[#667085]">{record.certificateNumber}</td>
-                  <td className="px-4 py-3 text-[#667085]">{record.place || '-'}</td>
-                  <td className="px-4 py-3 text-[#667085]">{record.officiant || '-'}</td>
-                  <td className="px-4 py-3 text-[#667085]">
-                    <span className="block">{record.sponsor1Name || '-'}</span>
-                    <span className="block text-xs">{record.sponsor2Name || '-'}</span>
-                  </td>
-                </tr>
-              ))}
+                  OK
+                </button>
+              </div>
+            )}
 
-              {!isLoading && filteredRecords.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">
-                    Aucun acte trouve pour ces filtres.
-                  </td>
-                </tr>
-              )}
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              <button
+                type="button"
+                onClick={() => setSelectedAgeGroup('ALL')}
+                className={`rounded-2xl border p-4 text-left transition ${selectedAgeGroup === 'ALL' ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}
+              >
+                <p className="text-sm font-bold text-[#0F3D2E]">Tous</p>
+                <p className="text-xs font-semibold text-[#667085]">{members.length} chretiens</p>
+              </button>
 
-              {isLoading && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">
-                    Chargement des registres...
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              {ageGroupDefinitions.map((group) => {
+                const count = members.filter((member) => getMemberAgeGroup(member) === group.key).length;
+                const isSelected = selectedAgeGroup === group.key;
+
+                return (
+                  <button
+                    type="button"
+                    key={group.key}
+                    onClick={() => setSelectedAgeGroup(group.key)}
+                    className={`rounded-2xl border p-4 text-left transition ${isSelected ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}
+                  >
+                    <p className="text-sm font-bold text-[#0F3D2E]">{group.label}</p>
+                    <p className="text-xs font-semibold text-[#667085]">{group.range}</p>
+                    <p className="mt-1 text-xs font-bold text-[#9D7A1E]">{count} personne{count > 1 ? 's' : ''}</p>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_130px_170px_170px_170px_auto]">
+              <label className="flex h-11 items-center gap-3 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4">
+                <CatholicIcon name="search" className="h-5 w-5 text-[#9D7A1E]" />
+                <input
+                  value={christianSearchTerm}
+                  onChange={(event) => setChristianSearchTerm(event.target.value)}
+                  placeholder="Rechercher nom, code, telephone, ville"
+                  className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-[#98A2B3]"
+                />
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={4}
+                value={christianYear}
+                onChange={(event) => setChristianYear(event.target.value.replace(/\D/g, '').slice(0, 4))}
+                placeholder="Annee"
+                className={filterInputClass}
+                aria-label="Annee"
+              />
+              <input
+                type="date"
+                value={christianStartDate}
+                onChange={(event) => setChristianStartDate(event.target.value)}
+                className={filterInputClass}
+                aria-label="Date debut"
+              />
+              <input
+                type="date"
+                value={christianEndDate}
+                onChange={(event) => setChristianEndDate(event.target.value)}
+                className={filterInputClass}
+                aria-label="Date fin"
+              />
+              <select
+                value={selectedMemberStatus}
+                onChange={(event) => setSelectedMemberStatus(event.target.value as MemberStatusFilter)}
+                className={filterInputClass}
+              >
+                <option value="ALL">Tous statuts</option>
+                <option value="ACTIVE">Actif</option>
+                <option value="INACTIVE">Inactif</option>
+                <option value="DECEASED">Decede</option>
+              </select>
+              <button
+                type="button"
+                onClick={handleResetChristianFilters}
+                className="rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]"
+              >
+                Reinitialiser
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Table du registre</p>
+                <h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">Registre des chretiens</h3>
+              </div>
+              <p className="text-sm font-semibold text-[#667085]">
+                {filteredMembers.length} personne{filteredMembers.length > 1 ? 's' : ''} affichee{filteredMembers.length > 1 ? 's' : ''}
+              </p>
+            </div>
+
+            <div className="mt-5 overflow-hidden rounded-xl border border-[#EEE6D6]">
+              <table className="w-full min-w-[1000px] text-left text-sm">
+                <thead className="bg-[#FFF9EE] text-xs uppercase tracking-wide text-[#9D7A1E]">
+                  <tr>
+                    <th className="px-4 py-3">No</th>
+                    <th className="px-4 py-3">Code</th>
+                    <th className="px-4 py-3">Nom</th>
+                    <th className="px-4 py-3">Age</th>
+                    <th className="px-4 py-3">Groupe</th>
+                    <th className="px-4 py-3">Sexe</th>
+                    <th className="px-4 py-3">Telephone</th>
+                    <th className="px-4 py-3">Ville</th>
+                    <th className="px-4 py-3">Statut</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EEE6D6]">
+                  {filteredMembers.map((member, index) => {
+                    const age = getAge(member.dateOfBirth);
+
+                    return (
+                      <tr
+                        key={member.id}
+                        onClick={() => setSelectedMember(member)}
+                        className="cursor-pointer bg-white transition hover:bg-[#FFF9EE]"
+                      >
+                        <td className="px-4 py-3 font-bold text-[#0F3D2E]">{String(index + 1).padStart(3, '0')}</td>
+                        <td className="px-4 py-3 font-semibold text-[#344054]">{member.memberCode}</td>
+                        <td className="px-4 py-3 font-semibold text-[#1F2933]">
+                          {member.firstName} {member.lastName}
+                          <span className="block text-xs font-bold text-[#667085]">{member.middleName || '-'}</span>
+                        </td>
+                        <td className="px-4 py-3 text-[#667085]">{age ?? '-'}</td>
+                        <td className="px-4 py-3 font-bold text-[#0F3D2E]">{getAgeGroupLabel(getMemberAgeGroup(member))}</td>
+                        <td className="px-4 py-3 text-[#667085]">{member.gender === 'MALE' ? 'M' : member.gender === 'FEMALE' ? 'F' : '-'}</td>
+                        <td className="px-4 py-3 text-[#667085]">{member.phone || '-'}</td>
+                        <td className="px-4 py-3 text-[#667085]">{member.city || '-'}</td>
+                        <td className="px-4 py-3 text-[#667085]">{statusLabels[member.status]}</td>
+                      </tr>
+                    );
+                  })}
+
+                  {!isLoading && filteredMembers.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">
+                        Aucun chretien trouve pour ces filtres.
+                      </td>
+                    </tr>
+                  )}
+
+                  {isLoading && (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">
+                        Chargement des chretiens...
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      )}
 
       {isRegisterPreviewOpen && registerPreviewHtml && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
@@ -786,7 +1344,7 @@ export function RegistersPage() {
             <div className="flex items-center justify-between gap-4 border-b border-[#E5DED0] bg-[#FFF9EE] px-5 py-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Apercu impression</p>
-                <h3 className="font-serif text-xl font-bold text-[#0F3D2E]">{activeRegisterName}</h3>
+                <h3 className="font-serif text-xl font-bold text-[#0F3D2E]">{registerMode === 'christians' ? 'Registre des chretiens' : activeRegisterName}</h3>
               </div>
               <div className="flex gap-2">
                 <button
@@ -846,6 +1404,42 @@ export function RegistersPage() {
 
             <div className="mt-5 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] p-4 text-sm font-semibold text-[#667085]">
               La modification et les certificats se font dans la page Sacrements. Cette page est reservee a la consultation officielle des registres.
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {selectedMember && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/20" role="dialog" aria-modal="true">
+          <aside className="h-full w-full max-w-md overflow-auto border-l border-[#D8C8A2] bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Dossier chretien</p>
+                <h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{selectedMember.firstName} {selectedMember.lastName}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedMember(null)}
+                className="rounded-lg border border-[#D8C8A2] px-3 py-1.5 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]"
+              >
+                Fermer
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-3 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] p-4 text-sm">
+              <p><span className="font-bold text-[#9D7A1E]">Code:</span> {selectedMember.memberCode}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Age:</span> {getAge(selectedMember.dateOfBirth) ?? '-'}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Groupe:</span> {getAgeGroupLabel(getMemberAgeGroup(selectedMember))}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Date naissance:</span> {formatDate(selectedMember.dateOfBirth)}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Lieu naissance:</span> {selectedMember.birthPlace || '-'}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Sexe:</span> {selectedMember.gender === 'MALE' ? 'Masculin' : selectedMember.gender === 'FEMALE' ? 'Feminin' : '-'}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Telephone:</span> {selectedMember.phone || '-'}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Ville:</span> {selectedMember.city || '-'}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Statut:</span> {statusLabels[selectedMember.status]}</p>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] p-4 text-sm font-semibold text-[#667085]">
+              La modification du dossier chretien se fait dans la page Paroissiens. Cette section sert a consulter et imprimer les registres.
             </div>
           </aside>
         </div>
