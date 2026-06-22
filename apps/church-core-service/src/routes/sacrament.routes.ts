@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireAuth } from "../middlewares/auth.js";
 import { createSacrament } from "../repositories/sacrament-create.repository.js";
+import { findSacramentDetailForChurch, type SacramentDetail } from "../repositories/sacrament-detail.repository.js";
 import { listSacramentsByChurch } from "../repositories/sacrament-list.repository.js";
 import { updateSacramentForChurch } from "../repositories/sacrament-update.repository.js";
 
@@ -46,6 +47,35 @@ function formatSacrament(sacrament: any) {
     memberLastName: sacrament.member_last_name,
     certificateNumber: sacrament.certificate_number,
     sacramentTypeId: sacrament.sacrament_type_id,
+    sacramentTypeName: sacrament.sacrament_type_name,
+    sacramentDate: sacrament.sacrament_date,
+    place: sacrament.place,
+    officiant: sacrament.officiant,
+    sponsor1Name: sacrament.sponsor1_name,
+    sponsor2Name: sacrament.sponsor2_name,
+    notes: sacrament.notes,
+    createdBy: sacrament.created_by,
+    createdAt: sacrament.created_at,
+    updatedAt: sacrament.updated_at
+  };
+}
+
+function formatSacramentDetail(sacrament: SacramentDetail) {
+  return {
+    id: sacrament.id,
+    churchId: sacrament.church_id,
+    memberId: sacrament.member_id,
+    memberCode: sacrament.member_code,
+    memberFirstName: sacrament.member_first_name,
+    memberLastName: sacrament.member_last_name,
+    memberMiddleName: sacrament.member_middle_name,
+    memberDateOfBirth: sacrament.member_date_of_birth,
+    memberBirthPlace: sacrament.member_birth_place,
+    memberFatherName: sacrament.member_father_name,
+    memberMotherName: sacrament.member_mother_name,
+    certificateNumber: sacrament.certificate_number,
+    sacramentTypeId: sacrament.sacrament_type_id,
+    sacramentTypeCode: sacrament.sacrament_type_code,
     sacramentTypeName: sacrament.sacrament_type_name,
     sacramentDate: sacrament.sacrament_date,
     place: sacrament.place,
@@ -121,6 +151,38 @@ export async function sacramentRoutes(app: FastifyInstance) {
         limit,
         count: sacraments.length
       }
+    });
+  });
+
+  app.get("/core/sacraments/:id", async (request: FastifyRequest, reply: FastifyReply) => {
+    const authUser = requireAuth(request, reply);
+
+    if (!authUser) {
+      return;
+    }
+
+    const paramsParsed = sacramentParamsSchema.safeParse(request.params);
+
+    if (!paramsParsed.success) {
+      return reply.status(400).send({
+        message: "Invalid sacrament id",
+        errors: paramsParsed.error.flatten().fieldErrors
+      });
+    }
+
+    const sacrament = await findSacramentDetailForChurch({
+      sacramentId: paramsParsed.data.id,
+      churchId: authUser.churchId
+    });
+
+    if (!sacrament) {
+      return reply.status(404).send({
+        message: "Sacrament record not found"
+      });
+    }
+
+    return reply.send({
+      data: formatSacramentDetail(sacrament)
     });
   });
 
