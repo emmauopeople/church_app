@@ -259,7 +259,7 @@ const certificateTemplate = `<!DOCTYPE html>
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 13mm;
-      margin-top: 8mm;
+      margin-top: 12mm;
       padding: 0 10mm;
       text-align: center;
       font-family: Arial, sans-serif;
