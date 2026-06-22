@@ -355,6 +355,17 @@ export function SacramentsPage() {
     }
   };
 
+  const registerAlert = errorMessage
+    ? { type: 'error' as const, message: errorMessage }
+    : successMessage
+      ? { type: 'success' as const, message: successMessage }
+      : undefined;
+
+  const clearRegisterAlert = () => {
+    setErrorMessage('');
+    setSuccessMessage('');
+  };
+
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-[#D8C8A2] bg-[#FFF9EE] p-6 shadow-sm">
@@ -369,18 +380,6 @@ export function SacramentsPage() {
           </div>
         </div>
       </section>
-
-      {errorMessage && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-          {errorMessage}
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-700">
-          {successMessage}
-        </div>
-      )}
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)]">
         <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
@@ -602,6 +601,21 @@ export function SacramentsPage() {
             </select>
           </div>
         </div>
+
+        {registerAlert && (
+          <div className="mt-4 rounded-xl border border-[#EEE6D6] bg-white p-1">
+            <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${registerAlert.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
+              <p className="text-sm font-semibold">{registerAlert.message}</p>
+              <button
+                type="button"
+                onClick={clearRegisterAlert}
+                className="self-start rounded-lg border border-current px-4 py-1.5 text-sm font-bold sm:self-auto"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="mt-5 overflow-hidden rounded-xl border border-[#EEE6D6]">
           <table className="w-full text-left text-sm">
