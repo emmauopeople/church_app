@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { CatholicIcon, type CatholicIconName } from '../../components/decorative/CatholicIcon';
-import { listMembers } from '../members/members.api';
+import { listAllMembers } from '../members/members.api';
 import type { Member, MemberStatus } from '../members/members.types';
 import { listSacraments, listSacramentTypes } from '../sacraments/sacraments.api';
 import type { Sacrament, SacramentType } from '../sacraments/sacraments.types';
 
 const filterInputClass = 'h-11 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4 text-sm font-semibold text-[#344054] outline-none focus:border-[#D4AF37]';
+const christianPageSize = 25;
 
 type RegisterMode = 'sacraments' | 'christians';
 type AgeGroupKey = 'ALL' | 'CHILDREN' | 'YOUTHS' | 'YOUNG_ADULTS' | 'ADULTS' | 'OLDER_ADULTS' | 'UNKNOWN';
@@ -58,6 +59,17 @@ function escapeHtml(value: string | number | null | undefined) {
     .replaceAll("'", '&#039;');
 }
 
+function getSacramentIcon(type?: SacramentType): CatholicIconName {
+  const value = `${type?.code ?? ''} ${type?.name ?? ''}`.toLowerCase();
+
+  if (value.includes('bapt')) return 'water';
+  if (value.includes('mari')) return 'rings';
+  if (value.includes('confirm')) return 'dove';
+  if (value.includes('commun')) return 'chalice';
+
+  return 'book';
+}
+
 function getSearchableSacramentText(record: Sacrament) {
   return [
     record.memberFirstName,
@@ -89,17 +101,6 @@ function getSearchableMemberText(member: Member) {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
-function getSacramentIcon(type?: SacramentType): CatholicIconName {
-  const value = `${type?.code ?? ''} ${type?.name ?? ''}`.toLowerCase();
-
-  if (value.includes('bapt')) return 'water';
-  if (value.includes('mari')) return 'rings';
-  if (value.includes('confirm')) return 'dove';
-  if (value.includes('commun')) return 'chalice';
-
-  return 'book';
-}
-
 function isSacramentWithinDateRange(record: Sacrament, startDate: string, endDate: string) {
   const recordDate = getDateOnly(record.sacramentDate);
 
@@ -123,7 +124,9 @@ function getAge(dateOfBirth?: string | null) {
   let age = today.getFullYear() - birthDate.getFullYear();
   const monthDifference = today.getMonth() - birthDate.getMonth();
 
-  if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) age -= 1;
+  if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
+    age -= 1;
+  }
 
   return age >= 0 ? age : null;
 }
@@ -396,6 +399,7 @@ export function RegistersPage() {
   const [christianEndDate, setChristianEndDate] = useState('');
   const [selectedAgeGroup, setSelectedAgeGroup] = useState<AgeGroupKey>('ALL');
   const [selectedMemberStatus, setSelectedMemberStatus] = useState<MemberStatusFilter>('ALL');
+  const [christianPage, setChristianPage] = useState(1);
   const [selectedRecord, setSelectedRecord] = useState<Sacrament | null>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [registerPreviewHtml, setRegisterPreviewHtml] = useState('');
@@ -438,8 +442,8 @@ export function RegistersPage() {
         setIsChristianLoading(true);
         setChristianErrorMessage('');
 
-        const response = await listMembers({ page: 1, limit: 100 });
-        setMembers(response.data);
+        const allMembers = await listAllMembers();
+        setMembers(allMembers);
       } catch (error) {
         setChristianErrorMessage(error instanceof Error ? error.message : 'Impossible de charger le registre des chretiens.');
         setMembers([]);
@@ -451,12 +455,10 @@ export function RegistersPage() {
     loadChristianRegisters();
   }, [isChristianLoading, members.length, registerMode]);
 
-  const typeCounts = useMemo(() => {
-    return sacramentTypes.map((type) => ({
-      type,
-      count: records.filter((record) => record.sacramentTypeId === type.id).length,
-    }));
-  }, [records, sacramentTypes]);
+  const typeCounts = useMemo(() => sacramentTypes.map((type) => ({
+    type,
+    count: records.filter((record) => record.sacramentTypeId === type.id).length,
+  })), [records, sacramentTypes]);
 
   const filteredRecords = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
@@ -479,6 +481,14 @@ export function RegistersPage() {
       .sort((first, second) => `${first.lastName} ${first.firstName}`.localeCompare(`${second.lastName} ${second.firstName}`));
   }, [christianEndDate, christianSearchTerm, christianStartDate, christianYear, members, selectedAgeGroup, selectedMemberStatus]);
 
+  useEffect(() => {
+    setChristianPage(1);
+  }, [christianEndDate, christianSearchTerm, christianStartDate, christianYear, selectedAgeGroup, selectedMemberStatus]);
+
+  const christianTotalPages = Math.max(1, Math.ceil(filteredMembers.length / christianPageSize));
+  const safeChristianPage = Math.min(christianPage, christianTotalPages);
+  const christianStartIndex = (safeChristianPage - 1) * christianPageSize;
+  const paginatedMembers = filteredMembers.slice(christianStartIndex, christianStartIndex + christianPageSize);
   const currentYear = String(new Date().getFullYear());
   const recordsThisYear = records.filter((record) => getDateOnly(record.sacramentDate).startsWith(currentYear)).length;
   const membersThisYear = members.filter((member) => getMemberPeriodDate(member).startsWith(currentYear)).length;
@@ -499,6 +509,7 @@ export function RegistersPage() {
     setChristianYear('');
     setChristianStartDate('');
     setChristianEndDate('');
+    setChristianPage(1);
   };
 
   const handleOpenRegisterPreview = () => {
@@ -554,20 +565,11 @@ export function RegistersPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleOpenRegisterPreview}
-              className="inline-flex items-center gap-2 rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]"
-            >
+            <button type="button" onClick={handleOpenRegisterPreview} className="inline-flex items-center gap-2 rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">
               <CatholicIcon name="print" className="h-4 w-4" />
               Imprimer registre
             </button>
-            <button
-              type="button"
-              disabled
-              className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-[#0F3D2E] px-4 py-2 text-sm font-bold text-white opacity-50"
-              title="Export PDF du registre sera ajoute apres validation de cette page."
-            >
+            <button type="button" disabled className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-[#0F3D2E] px-4 py-2 text-sm font-bold text-white opacity-50" title="Export PDF du registre sera ajoute apres validation de cette page.">
               <CatholicIcon name="download" className="h-4 w-4" />
               Export PDF plus tard
             </button>
@@ -575,19 +577,11 @@ export function RegistersPage() {
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2 border-t border-[#E5DED0] pt-4">
-          <button
-            type="button"
-            onClick={() => setRegisterMode('sacraments')}
-            className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition ${registerMode === 'sacraments' ? 'bg-[#0F3D2E] text-white' : 'border border-[#D8C8A2] bg-white text-[#0F3D2E] hover:bg-[#FFF9EE]'}`}
-          >
+          <button type="button" onClick={() => setRegisterMode('sacraments')} className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition ${registerMode === 'sacraments' ? 'bg-[#0F3D2E] text-white' : 'border border-[#D8C8A2] bg-white text-[#0F3D2E] hover:bg-[#FFF9EE]'}`}>
             <CatholicIcon name="chalice" className="h-4 w-4" />
             Registres sacramentels
           </button>
-          <button
-            type="button"
-            onClick={() => setRegisterMode('christians')}
-            className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition ${registerMode === 'christians' ? 'bg-[#0F3D2E] text-white' : 'border border-[#D8C8A2] bg-white text-[#0F3D2E] hover:bg-[#FFF9EE]'}`}
-          >
+          <button type="button" onClick={() => setRegisterMode('christians')} className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition ${registerMode === 'christians' ? 'bg-[#0F3D2E] text-white' : 'border border-[#D8C8A2] bg-white text-[#0F3D2E] hover:bg-[#FFF9EE]'}`}>
             <CatholicIcon name="people" className="h-4 w-4" />
             Registre des chretiens
           </button>
@@ -597,75 +591,34 @@ export function RegistersPage() {
       {registerMode === 'sacraments' && (
         <>
           <section className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Total actes</p>
-              <p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{records.length}</p>
-              <p className="mt-1 text-sm font-semibold text-[#667085]">Actes charges dans le registre</p>
-            </div>
-            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Annee courante</p>
-              <p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{recordsThisYear}</p>
-              <p className="mt-1 text-sm font-semibold text-[#667085]">Actes enregistres en {currentYear}</p>
-            </div>
-            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Affichage actuel</p>
-              <p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{filteredRecords.length}</p>
-              <p className="mt-1 text-sm font-semibold text-[#667085]">Resultats apres filtres</p>
-            </div>
+            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Total actes</p><p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{records.length}</p><p className="mt-1 text-sm font-semibold text-[#667085]">Actes charges dans le registre</p></div>
+            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Annee courante</p><p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{recordsThisYear}</p><p className="mt-1 text-sm font-semibold text-[#667085]">Actes enregistres en {currentYear}</p></div>
+            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Affichage actuel</p><p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{filteredRecords.length}</p><p className="mt-1 text-sm font-semibold text-[#667085]">Resultats apres filtres</p></div>
           </section>
 
           <section className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Choisir un registre</p>
-                <h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{activeRegisterName}</h3>
-              </div>
-              {isSacramentLoading && <span className="text-sm font-semibold text-[#667085]">Chargement des registres...</span>}
-            </div>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Choisir un registre</p><h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{activeRegisterName}</h3></div>{isSacramentLoading && <span className="text-sm font-semibold text-[#667085]">Chargement des registres...</span>}</div>
 
-            {sacramentErrorMessage && (
-              <div className="mt-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm font-semibold">{sacramentErrorMessage}</p>
-                <button type="button" onClick={() => setSacramentErrorMessage('')} className="self-start rounded-lg border border-current px-4 py-1.5 text-sm font-bold sm:self-auto">OK</button>
-              </div>
-            )}
+            {sacramentErrorMessage && <div className="mt-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-semibold">{sacramentErrorMessage}</p><button type="button" onClick={() => setSacramentErrorMessage('')} className="self-start rounded-lg border border-current px-4 py-1.5 text-sm font-bold sm:self-auto">OK</button></div>}
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              <button
-                type="button"
-                onClick={() => setSelectedTypeId('')}
-                className={`rounded-2xl border p-4 text-left transition ${!selectedTypeId ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#0F3D2E]"><CatholicIcon name="book" className="h-5 w-5" /></div>
-                  <div><p className="text-sm font-bold text-[#0F3D2E]">Tous</p><p className="text-xs font-semibold text-[#667085]">{records.length} actes</p></div>
-                </div>
+              <button type="button" onClick={() => setSelectedTypeId('')} className={`rounded-2xl border p-4 text-left transition ${!selectedTypeId ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}>
+                <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#0F3D2E]"><CatholicIcon name="book" className="h-5 w-5" /></div><div><p className="text-sm font-bold text-[#0F3D2E]">Tous</p><p className="text-xs font-semibold text-[#667085]">{records.length} actes</p></div></div>
               </button>
 
               {typeCounts.map(({ type, count }) => {
                 const isSelected = selectedTypeId === String(type.id);
 
                 return (
-                  <button
-                    type="button"
-                    key={type.id}
-                    onClick={() => setSelectedTypeId(String(type.id))}
-                    className={`rounded-2xl border p-4 text-left transition ${isSelected ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#0F3D2E]"><CatholicIcon name={getSacramentIcon(type)} className="h-5 w-5" /></div>
-                      <div><p className="text-sm font-bold text-[#0F3D2E]">{type.name}</p><p className="text-xs font-semibold text-[#667085]">{count} actes</p></div>
-                    </div>
+                  <button type="button" key={type.id} onClick={() => setSelectedTypeId(String(type.id))} className={`rounded-2xl border p-4 text-left transition ${isSelected ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}>
+                    <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#0F3D2E]"><CatholicIcon name={getSacramentIcon(type)} className="h-5 w-5" /></div><div><p className="text-sm font-bold text-[#0F3D2E]">{type.name}</p><p className="text-xs font-semibold text-[#667085]">{count} actes</p></div></div>
                   </button>
                 );
               })}
             </div>
 
             <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_190px_190px_auto]">
-              <label className="flex h-11 items-center gap-3 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4">
-                <CatholicIcon name="search" className="h-5 w-5 text-[#9D7A1E]" />
-                <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Rechercher nom, code, certificat, officiant, lieu" className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-[#98A2B3]" />
-              </label>
+              <label className="flex h-11 items-center gap-3 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4"><CatholicIcon name="search" className="h-5 w-5 text-[#9D7A1E]" /><input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Rechercher nom, code, certificat, officiant, lieu" className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-[#98A2B3]" /></label>
               <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className={filterInputClass} aria-label="Date debut" />
               <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} className={filterInputClass} aria-label="Date fin" />
               <button type="button" onClick={handleResetSacramentFilters} className="rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">Reinitialiser</button>
@@ -673,32 +626,12 @@ export function RegistersPage() {
           </section>
 
           <section className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Table du registre</p><h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{activeRegisterName}</h3></div>
-              <p className="text-sm font-semibold text-[#667085]">{filteredRecords.length} entree{filteredRecords.length > 1 ? 's' : ''} affichee{filteredRecords.length > 1 ? 's' : ''}</p>
-            </div>
-
-            <div className="mt-5 overflow-hidden rounded-xl border border-[#EEE6D6]">
-              <table className="w-full min-w-[1100px] text-left text-sm">
-                <thead className="bg-[#FFF9EE] text-xs uppercase tracking-wide text-[#9D7A1E]"><tr><th className="px-4 py-3">No</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Paroissien</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Certificat</th><th className="px-4 py-3">Lieu</th><th className="px-4 py-3">Officiant</th><th className="px-4 py-3">Parrain / Marraine</th></tr></thead>
-                <tbody className="divide-y divide-[#EEE6D6]">
-                  {filteredRecords.map((record, index) => (
-                    <tr key={record.id} onClick={() => setSelectedRecord(record)} className="cursor-pointer bg-white transition hover:bg-[#FFF9EE]">
-                      <td className="px-4 py-3 font-bold text-[#0F3D2E]">{String(index + 1).padStart(3, '0')}</td>
-                      <td className="px-4 py-3 font-semibold text-[#344054]">{formatDate(record.sacramentDate)}</td>
-                      <td className="px-4 py-3 font-semibold text-[#1F2933]">{record.memberFirstName} {record.memberLastName}<span className="block text-xs font-bold text-[#667085]">{record.memberCode}</span></td>
-                      <td className="px-4 py-3 font-bold text-[#0F3D2E]">{record.sacramentTypeName}</td>
-                      <td className="px-4 py-3 text-[#667085]">{record.certificateNumber}</td>
-                      <td className="px-4 py-3 text-[#667085]">{record.place || '-'}</td>
-                      <td className="px-4 py-3 text-[#667085]">{record.officiant || '-'}</td>
-                      <td className="px-4 py-3 text-[#667085]"><span className="block">{record.sponsor1Name || '-'}</span><span className="block text-xs">{record.sponsor2Name || '-'}</span></td>
-                    </tr>
-                  ))}
-                  {!isSacramentLoading && filteredRecords.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">Aucun acte trouve pour ces filtres.</td></tr>}
-                  {isSacramentLoading && <tr><td colSpan={8} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">Chargement des registres...</td></tr>}
-                </tbody>
-              </table>
-            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Table du registre</p><h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{activeRegisterName}</h3></div><p className="text-sm font-semibold text-[#667085]">{filteredRecords.length} entree{filteredRecords.length > 1 ? 's' : ''} affichee{filteredRecords.length > 1 ? 's' : ''}</p></div>
+            <div className="mt-5 overflow-hidden rounded-xl border border-[#EEE6D6]"><table className="w-full min-w-[1100px] text-left text-sm"><thead className="bg-[#FFF9EE] text-xs uppercase tracking-wide text-[#9D7A1E]"><tr><th className="px-4 py-3">No</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Paroissien</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Certificat</th><th className="px-4 py-3">Lieu</th><th className="px-4 py-3">Officiant</th><th className="px-4 py-3">Parrain / Marraine</th></tr></thead><tbody className="divide-y divide-[#EEE6D6]">
+              {filteredRecords.map((record, index) => <tr key={record.id} onClick={() => setSelectedRecord(record)} className="cursor-pointer bg-white transition hover:bg-[#FFF9EE]"><td className="px-4 py-3 font-bold text-[#0F3D2E]">{String(index + 1).padStart(3, '0')}</td><td className="px-4 py-3 font-semibold text-[#344054]">{formatDate(record.sacramentDate)}</td><td className="px-4 py-3 font-semibold text-[#1F2933]">{record.memberFirstName} {record.memberLastName}<span className="block text-xs font-bold text-[#667085]">{record.memberCode}</span></td><td className="px-4 py-3 font-bold text-[#0F3D2E]">{record.sacramentTypeName}</td><td className="px-4 py-3 text-[#667085]">{record.certificateNumber}</td><td className="px-4 py-3 text-[#667085]">{record.place || '-'}</td><td className="px-4 py-3 text-[#667085]">{record.officiant || '-'}</td><td className="px-4 py-3 text-[#667085]"><span className="block">{record.sponsor1Name || '-'}</span><span className="block text-xs">{record.sponsor2Name || '-'}</span></td></tr>)}
+              {!isSacramentLoading && filteredRecords.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">Aucun acte trouve pour ces filtres.</td></tr>}
+              {isSacramentLoading && <tr><td colSpan={8} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">Chargement des registres...</td></tr>}
+            </tbody></table></div>
           </section>
         </>
       )}
@@ -706,110 +639,67 @@ export function RegistersPage() {
       {registerMode === 'christians' && (
         <>
           <section className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Total chretiens</p><p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{members.length}</p><p className="mt-1 text-sm font-semibold text-[#667085]">Paroissiens charges</p></div>
+            <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Total chretiens</p><p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{members.length}</p><p className="mt-1 text-sm font-semibold text-[#667085]">Tous les paroissiens charges</p></div>
             <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Inscrits cette annee</p><p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{membersThisYear}</p><p className="mt-1 text-sm font-semibold text-[#667085]">Dossiers crees en {currentYear}</p></div>
             <div className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Affichage actuel</p><p className="mt-2 font-serif text-3xl font-bold text-[#0F3D2E]">{filteredMembers.length}</p><p className="mt-1 text-sm font-semibold text-[#667085]">Resultats apres filtres</p></div>
           </section>
 
           <section className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Registre des chretiens</p><h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{activeAgeGroupName}</h3></div>
-              {isChristianLoading && <span className="text-sm font-semibold text-[#667085]">Chargement des chretiens...</span>}
-            </div>
-
-            {christianErrorMessage && (
-              <div className="mt-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm font-semibold">{christianErrorMessage}</p>
-                <button type="button" onClick={() => setChristianErrorMessage('')} className="self-start rounded-lg border border-current px-4 py-1.5 text-sm font-bold sm:self-auto">OK</button>
-              </div>
-            )}
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Registre des chretiens</p><h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{activeAgeGroupName}</h3></div>{isChristianLoading && <span className="text-sm font-semibold text-[#667085]">Chargement de tous les chretiens...</span>}</div>
+            {christianErrorMessage && <div className="mt-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-semibold">{christianErrorMessage}</p><button type="button" onClick={() => setChristianErrorMessage('')} className="self-start rounded-lg border border-current px-4 py-1.5 text-sm font-bold sm:self-auto">OK</button></div>}
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-              <button type="button" onClick={() => setSelectedAgeGroup('ALL')} className={`rounded-2xl border p-4 text-left transition ${selectedAgeGroup === 'ALL' ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}>
-                <p className="text-sm font-bold text-[#0F3D2E]">Tous</p><p className="text-xs font-semibold text-[#667085]">{members.length} chretiens</p>
-              </button>
+              <button type="button" onClick={() => setSelectedAgeGroup('ALL')} className={`rounded-2xl border p-4 text-left transition ${selectedAgeGroup === 'ALL' ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}><p className="text-sm font-bold text-[#0F3D2E]">Tous</p><p className="text-xs font-semibold text-[#667085]">{members.length} chretiens</p></button>
               {ageGroups.map((group) => {
                 const count = members.filter((member) => getMemberAgeGroup(member) === group.key).length;
                 const isSelected = selectedAgeGroup === group.key;
 
-                return (
-                  <button type="button" key={group.key} onClick={() => setSelectedAgeGroup(group.key)} className={`rounded-2xl border p-4 text-left transition ${isSelected ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}>
-                    <p className="text-sm font-bold text-[#0F3D2E]">{group.label}</p><p className="text-xs font-semibold text-[#667085]">{group.range}</p><p className="mt-1 text-xs font-bold text-[#9D7A1E]">{count} personne{count > 1 ? 's' : ''}</p>
-                  </button>
-                );
+                return <button type="button" key={group.key} onClick={() => setSelectedAgeGroup(group.key)} className={`rounded-2xl border p-4 text-left transition ${isSelected ? 'border-[#0F3D2E] bg-[#F4E8C8]' : 'border-[#E5DED0] bg-[#FFFDF8] hover:bg-[#FFF9EE]'}`}><p className="text-sm font-bold text-[#0F3D2E]">{group.label}</p><p className="text-xs font-semibold text-[#667085]">{group.range}</p><p className="mt-1 text-xs font-bold text-[#9D7A1E]">{count} personne{count > 1 ? 's' : ''}</p></button>;
               })}
             </div>
 
             <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_130px_170px_170px_170px_auto]">
-              <label className="flex h-11 items-center gap-3 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4">
-                <CatholicIcon name="search" className="h-5 w-5 text-[#9D7A1E]" />
-                <input value={christianSearchTerm} onChange={(event) => setChristianSearchTerm(event.target.value)} placeholder="Rechercher nom, code, telephone, ville" className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-[#98A2B3]" />
-              </label>
+              <label className="flex h-11 items-center gap-3 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4"><CatholicIcon name="search" className="h-5 w-5 text-[#9D7A1E]" /><input value={christianSearchTerm} onChange={(event) => setChristianSearchTerm(event.target.value)} placeholder="Rechercher nom, code, telephone, ville" className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-[#98A2B3]" /></label>
               <input type="text" inputMode="numeric" maxLength={4} value={christianYear} onChange={(event) => setChristianYear(event.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="Annee" className={filterInputClass} aria-label="Annee" />
               <input type="date" value={christianStartDate} onChange={(event) => setChristianStartDate(event.target.value)} className={filterInputClass} aria-label="Date debut" />
               <input type="date" value={christianEndDate} onChange={(event) => setChristianEndDate(event.target.value)} className={filterInputClass} aria-label="Date fin" />
-              <select value={selectedMemberStatus} onChange={(event) => setSelectedMemberStatus(event.target.value as MemberStatusFilter)} className={filterInputClass}>
-                <option value="ALL">Tous statuts</option><option value="ACTIVE">Actif</option><option value="INACTIVE">Inactif</option><option value="DECEASED">Decede</option>
-              </select>
+              <select value={selectedMemberStatus} onChange={(event) => setSelectedMemberStatus(event.target.value as MemberStatusFilter)} className={filterInputClass}><option value="ALL">Tous statuts</option><option value="ACTIVE">Actif</option><option value="INACTIVE">Inactif</option><option value="DECEASED">Decede</option></select>
               <button type="button" onClick={handleResetChristianFilters} className="rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">Reinitialiser</button>
             </div>
           </section>
 
           <section className="rounded-2xl border border-[#E5DED0] bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Table du registre</p><h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">Registre des chretiens</h3></div><p className="text-sm font-semibold text-[#667085]">{filteredMembers.length} personne{filteredMembers.length > 1 ? 's' : ''} affichee{filteredMembers.length > 1 ? 's' : ''}</p></div>
-            <div className="mt-5 overflow-hidden rounded-xl border border-[#EEE6D6]">
-              <table className="w-full min-w-[1000px] text-left text-sm">
-                <thead className="bg-[#FFF9EE] text-xs uppercase tracking-wide text-[#9D7A1E]"><tr><th className="px-4 py-3">No</th><th className="px-4 py-3">Code</th><th className="px-4 py-3">Nom</th><th className="px-4 py-3">Age</th><th className="px-4 py-3">Groupe</th><th className="px-4 py-3">Sexe</th><th className="px-4 py-3">Telephone</th><th className="px-4 py-3">Ville</th><th className="px-4 py-3">Statut</th></tr></thead>
-                <tbody className="divide-y divide-[#EEE6D6]">
-                  {filteredMembers.map((member, index) => {
-                    const age = getAge(member.dateOfBirth);
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Table du registre</p><h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">Registre des chretiens</h3></div><p className="text-sm font-semibold text-[#667085]">{filteredMembers.length} personne{filteredMembers.length > 1 ? 's' : ''} trouvee{filteredMembers.length > 1 ? 's' : ''} - page {safeChristianPage} sur {christianTotalPages}</p></div>
+            <div className="mt-5 overflow-hidden rounded-xl border border-[#EEE6D6]"><table className="w-full min-w-[1000px] text-left text-sm"><thead className="bg-[#FFF9EE] text-xs uppercase tracking-wide text-[#9D7A1E]"><tr><th className="px-4 py-3">No</th><th className="px-4 py-3">Code</th><th className="px-4 py-3">Nom</th><th className="px-4 py-3">Age</th><th className="px-4 py-3">Groupe</th><th className="px-4 py-3">Sexe</th><th className="px-4 py-3">Telephone</th><th className="px-4 py-3">Ville</th><th className="px-4 py-3">Statut</th></tr></thead><tbody className="divide-y divide-[#EEE6D6]">
+              {paginatedMembers.map((member, index) => {
+                const age = getAge(member.dateOfBirth);
+                const rowNumber = christianStartIndex + index + 1;
 
-                    return (
-                      <tr key={member.id} onClick={() => setSelectedMember(member)} className="cursor-pointer bg-white transition hover:bg-[#FFF9EE]">
-                        <td className="px-4 py-3 font-bold text-[#0F3D2E]">{String(index + 1).padStart(3, '0')}</td><td className="px-4 py-3 font-semibold text-[#344054]">{member.memberCode}</td><td className="px-4 py-3 font-semibold text-[#1F2933]">{member.firstName} {member.lastName}<span className="block text-xs font-bold text-[#667085]">{member.middleName || '-'}</span></td><td className="px-4 py-3 text-[#667085]">{age ?? '-'}</td><td className="px-4 py-3 font-bold text-[#0F3D2E]">{getAgeGroupLabel(getMemberAgeGroup(member))}</td><td className="px-4 py-3 text-[#667085]">{member.gender === 'MALE' ? 'M' : member.gender === 'FEMALE' ? 'F' : '-'}</td><td className="px-4 py-3 text-[#667085]">{member.phone || '-'}</td><td className="px-4 py-3 text-[#667085]">{member.city || '-'}</td><td className="px-4 py-3 text-[#667085]">{statusLabels[member.status]}</td>
-                      </tr>
-                    );
-                  })}
-                  {!isChristianLoading && filteredMembers.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">Aucun chretien trouve pour ces filtres.</td></tr>}
-                  {isChristianLoading && <tr><td colSpan={9} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">Chargement des chretiens...</td></tr>}
-                </tbody>
-              </table>
-            </div>
+                return <tr key={member.id} onClick={() => setSelectedMember(member)} className="cursor-pointer bg-white transition hover:bg-[#FFF9EE]"><td className="px-4 py-3 font-bold text-[#0F3D2E]">{String(rowNumber).padStart(3, '0')}</td><td className="px-4 py-3 font-semibold text-[#344054]">{member.memberCode}</td><td className="px-4 py-3 font-semibold text-[#1F2933]">{member.firstName} {member.lastName}<span className="block text-xs font-bold text-[#667085]">{member.middleName || '-'}</span></td><td className="px-4 py-3 text-[#667085]">{age ?? '-'}</td><td className="px-4 py-3 font-bold text-[#0F3D2E]">{getAgeGroupLabel(getMemberAgeGroup(member))}</td><td className="px-4 py-3 text-[#667085]">{member.gender === 'MALE' ? 'M' : member.gender === 'FEMALE' ? 'F' : '-'}</td><td className="px-4 py-3 text-[#667085]">{member.phone || '-'}</td><td className="px-4 py-3 text-[#667085]">{member.city || '-'}</td><td className="px-4 py-3 text-[#667085]">{statusLabels[member.status]}</td></tr>;
+              })}
+              {!isChristianLoading && filteredMembers.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">Aucun chretien trouve pour ces filtres.</td></tr>}
+              {isChristianLoading && <tr><td colSpan={9} className="px-4 py-8 text-center text-sm font-semibold text-[#667085]">Chargement des chretiens...</td></tr>}
+            </tbody></table></div>
+
+            {filteredMembers.length > 0 && (
+              <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-semibold text-[#667085]">Affichage {christianStartIndex + 1} - {Math.min(christianStartIndex + christianPageSize, filteredMembers.length)} sur {filteredMembers.length}</p>
+                <div className="flex items-center gap-2">
+                  <button type="button" disabled={safeChristianPage <= 1} onClick={() => setChristianPage((page) => Math.max(1, page - 1))} className="rounded-lg border border-[#D8C8A2] bg-white px-3 py-1.5 text-sm font-bold text-[#0F3D2E] disabled:cursor-not-allowed disabled:opacity-50">Precedent</button>
+                  <span className="text-sm font-bold text-[#0F3D2E]">Page {safeChristianPage} / {christianTotalPages}</span>
+                  <button type="button" disabled={safeChristianPage >= christianTotalPages} onClick={() => setChristianPage((page) => Math.min(christianTotalPages, page + 1))} className="rounded-lg border border-[#D8C8A2] bg-white px-3 py-1.5 text-sm font-bold text-[#0F3D2E] disabled:cursor-not-allowed disabled:opacity-50">Suivant</button>
+                </div>
+              </div>
+            )}
           </section>
         </>
       )}
 
-      {isRegisterPreviewOpen && registerPreviewHtml && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
-          <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[#D8C8A2] bg-white shadow-2xl">
-            <div className="flex items-center justify-between gap-4 border-b border-[#E5DED0] bg-[#FFF9EE] px-5 py-4">
-              <div><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Apercu impression</p><h3 className="font-serif text-xl font-bold text-[#0F3D2E]">{registerMode === 'christians' ? 'Registre des chretiens' : activeRegisterName}</h3></div>
-              <div className="flex gap-2"><button type="button" onClick={handlePrintRegisterPreview} className="rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">Imprimer</button><button type="button" onClick={handleCloseRegisterPreview} className="rounded-xl bg-[#0F3D2E] px-4 py-2 text-sm font-bold text-white hover:bg-[#145C43]">Fermer</button></div>
-            </div>
-            <iframe ref={printFrameRef} title="Apercu impression registre" srcDoc={registerPreviewHtml} className="h-full w-full bg-[#EFE7D6]" />
-          </div>
-        </div>
-      )}
+      {isRegisterPreviewOpen && registerPreviewHtml && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true"><div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[#D8C8A2] bg-white shadow-2xl"><div className="flex items-center justify-between gap-4 border-b border-[#E5DED0] bg-[#FFF9EE] px-5 py-4"><div><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Apercu impression</p><h3 className="font-serif text-xl font-bold text-[#0F3D2E]">{registerMode === 'christians' ? 'Registre des chretiens' : activeRegisterName}</h3></div><div className="flex gap-2"><button type="button" onClick={handlePrintRegisterPreview} className="rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">Imprimer</button><button type="button" onClick={handleCloseRegisterPreview} className="rounded-xl bg-[#0F3D2E] px-4 py-2 text-sm font-bold text-white hover:bg-[#145C43]">Fermer</button></div></div><iframe ref={printFrameRef} title="Apercu impression registre" srcDoc={registerPreviewHtml} className="h-full w-full bg-[#EFE7D6]" /></div></div>}
 
-      {selectedRecord && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/20" role="dialog" aria-modal="true">
-          <aside className="h-full w-full max-w-md overflow-auto border-l border-[#D8C8A2] bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Entree du registre</p><h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{selectedRecord.sacramentTypeName}</h3></div><button type="button" onClick={() => setSelectedRecord(null)} className="rounded-lg border border-[#D8C8A2] px-3 py-1.5 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">Fermer</button></div>
-            <div className="mt-6 space-y-3 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] p-4 text-sm"><p><span className="font-bold text-[#9D7A1E]">Paroissien:</span> {selectedRecord.memberFirstName} {selectedRecord.memberLastName}</p><p><span className="font-bold text-[#9D7A1E]">Code:</span> {selectedRecord.memberCode}</p><p><span className="font-bold text-[#9D7A1E]">Certificat:</span> {selectedRecord.certificateNumber}</p><p><span className="font-bold text-[#9D7A1E]">Date:</span> {formatDate(selectedRecord.sacramentDate)}</p><p><span className="font-bold text-[#9D7A1E]">Lieu:</span> {selectedRecord.place || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Officiant:</span> {selectedRecord.officiant || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Parrain:</span> {selectedRecord.sponsor1Name || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Marraine:</span> {selectedRecord.sponsor2Name || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Notes:</span> {selectedRecord.notes || '-'}</p></div>
-            <div className="mt-5 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] p-4 text-sm font-semibold text-[#667085]">La modification et les certificats se font dans la page Sacrements. Cette page est reservee a la consultation officielle des registres.</div>
-          </aside>
-        </div>
-      )}
+      {selectedRecord && <div className="fixed inset-0 z-50 flex justify-end bg-black/20" role="dialog" aria-modal="true"><aside className="h-full w-full max-w-md overflow-auto border-l border-[#D8C8A2] bg-white p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Entree du registre</p><h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{selectedRecord.sacramentTypeName}</h3></div><button type="button" onClick={() => setSelectedRecord(null)} className="rounded-lg border border-[#D8C8A2] px-3 py-1.5 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">Fermer</button></div><div className="mt-6 space-y-3 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] p-4 text-sm"><p><span className="font-bold text-[#9D7A1E]">Paroissien:</span> {selectedRecord.memberFirstName} {selectedRecord.memberLastName}</p><p><span className="font-bold text-[#9D7A1E]">Code:</span> {selectedRecord.memberCode}</p><p><span className="font-bold text-[#9D7A1E]">Certificat:</span> {selectedRecord.certificateNumber}</p><p><span className="font-bold text-[#9D7A1E]">Date:</span> {formatDate(selectedRecord.sacramentDate)}</p><p><span className="font-bold text-[#9D7A1E]">Lieu:</span> {selectedRecord.place || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Officiant:</span> {selectedRecord.officiant || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Parrain:</span> {selectedRecord.sponsor1Name || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Marraine:</span> {selectedRecord.sponsor2Name || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Notes:</span> {selectedRecord.notes || '-'}</p></div><div className="mt-5 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] p-4 text-sm font-semibold text-[#667085]">La modification et les certificats se font dans la page Sacrements. Cette page est reservee a la consultation officielle des registres.</div></aside></div>}
 
-      {selectedMember && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/20" role="dialog" aria-modal="true">
-          <aside className="h-full w-full max-w-md overflow-auto border-l border-[#D8C8A2] bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Dossier chretien</p><h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{selectedMember.firstName} {selectedMember.lastName}</h3></div><button type="button" onClick={() => setSelectedMember(null)} className="rounded-lg border border-[#D8C8A2] px-3 py-1.5 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">Fermer</button></div>
-            <div className="mt-6 space-y-3 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] p-4 text-sm"><p><span className="font-bold text-[#9D7A1E]">Code:</span> {selectedMember.memberCode}</p><p><span className="font-bold text-[#9D7A1E]">Age:</span> {getAge(selectedMember.dateOfBirth) ?? '-'}</p><p><span className="font-bold text-[#9D7A1E]">Groupe:</span> {getAgeGroupLabel(getMemberAgeGroup(selectedMember))}</p><p><span className="font-bold text-[#9D7A1E]">Date naissance:</span> {formatDate(selectedMember.dateOfBirth)}</p><p><span className="font-bold text-[#9D7A1E]">Lieu naissance:</span> {selectedMember.birthPlace || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Sexe:</span> {selectedMember.gender === 'MALE' ? 'Masculin' : selectedMember.gender === 'FEMALE' ? 'Feminin' : '-'}</p><p><span className="font-bold text-[#9D7A1E]">Telephone:</span> {selectedMember.phone || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Ville:</span> {selectedMember.city || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Statut:</span> {statusLabels[selectedMember.status]}</p></div>
-            <div className="mt-5 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] p-4 text-sm font-semibold text-[#667085]">La modification du dossier chretien se fait dans la page Paroissiens. Cette section sert a consulter et imprimer les registres.</div>
-          </aside>
-        </div>
-      )}
+      {selectedMember && <div className="fixed inset-0 z-50 flex justify-end bg-black/20" role="dialog" aria-modal="true"><aside className="h-full w-full max-w-md overflow-auto border-l border-[#D8C8A2] bg-white p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Dossier chretien</p><h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">{selectedMember.firstName} {selectedMember.lastName}</h3></div><button type="button" onClick={() => setSelectedMember(null)} className="rounded-lg border border-[#D8C8A2] px-3 py-1.5 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">Fermer</button></div><div className="mt-6 space-y-3 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] p-4 text-sm"><p><span className="font-bold text-[#9D7A1E]">Code:</span> {selectedMember.memberCode}</p><p><span className="font-bold text-[#9D7A1E]">Age:</span> {getAge(selectedMember.dateOfBirth) ?? '-'}</p><p><span className="font-bold text-[#9D7A1E]">Groupe:</span> {getAgeGroupLabel(getMemberAgeGroup(selectedMember))}</p><p><span className="font-bold text-[#9D7A1E]">Date naissance:</span> {formatDate(selectedMember.dateOfBirth)}</p><p><span className="font-bold text-[#9D7A1E]">Lieu naissance:</span> {selectedMember.birthPlace || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Sexe:</span> {selectedMember.gender === 'MALE' ? 'Masculin' : selectedMember.gender === 'FEMALE' ? 'Feminin' : '-'}</p><p><span className="font-bold text-[#9D7A1E]">Telephone:</span> {selectedMember.phone || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Ville:</span> {selectedMember.city || '-'}</p><p><span className="font-bold text-[#9D7A1E]">Statut:</span> {statusLabels[selectedMember.status]}</p></div><div className="mt-5 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] p-4 text-sm font-semibold text-[#667085]">La modification du dossier chretien se fait dans la page Paroissiens. Cette section sert a consulter et imprimer les registres.</div></aside></div>}
     </div>
   );
 }
