@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { CatholicIcon, type CatholicIconName } from '../../components/decorative/CatholicIcon';
 import { listSacraments, listSacramentTypes } from '../sacraments/sacraments.api';
@@ -24,6 +24,15 @@ function formatDate(value?: string | null) {
   }
 
   return `${day}/${month}/${year}`;
+}
+
+function escapeHtml(value: string | number | null | undefined) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
 }
 
 function getSearchableRecordText(record: Sacrament) {
@@ -84,7 +93,231 @@ function isRecordWithinDateRange(record: Sacrament, startDate: string, endDate: 
   return true;
 }
 
+function buildRegisterFilterText(params: {
+  registerName: string;
+  startDate: string;
+  endDate: string;
+  searchTerm: string;
+  count: number;
+}) {
+  const filters = [
+    `Registre: ${params.registerName}`,
+    params.startDate ? `Du: ${formatDate(params.startDate)}` : '',
+    params.endDate ? `Au: ${formatDate(params.endDate)}` : '',
+    params.searchTerm.trim() ? `Recherche: ${params.searchTerm.trim()}` : '',
+    `Total: ${params.count} entree${params.count > 1 ? 's' : ''}`,
+  ].filter(Boolean);
+
+  return filters.join(' | ');
+}
+
+function buildRegisterPrintDocumentHtml(params: {
+  registerName: string;
+  records: Sacrament[];
+  startDate: string;
+  endDate: string;
+  searchTerm: string;
+}) {
+  const generatedAt = formatDate(new Date().toISOString());
+  const filterText = buildRegisterFilterText({
+    registerName: params.registerName,
+    startDate: params.startDate,
+    endDate: params.endDate,
+    searchTerm: params.searchTerm,
+    count: params.records.length,
+  });
+
+  const rows = params.records.map((record, index) => `
+    <tr>
+      <td>${String(index + 1).padStart(3, '0')}</td>
+      <td>${escapeHtml(formatDate(record.sacramentDate))}</td>
+      <td>
+        <strong>${escapeHtml(`${record.memberFirstName} ${record.memberLastName}`)}</strong>
+        <span>${escapeHtml(record.memberCode)}</span>
+      </td>
+      <td>${escapeHtml(record.sacramentTypeName)}</td>
+      <td>${escapeHtml(record.certificateNumber)}</td>
+      <td>${escapeHtml(record.place || '-')}</td>
+      <td>${escapeHtml(record.officiant || '-')}</td>
+      <td>${escapeHtml(record.sponsor1Name || '-')}<br />${escapeHtml(record.sponsor2Name || '-')}</td>
+      <td>${escapeHtml(record.notes || '-')}</td>
+    </tr>
+  `).join('');
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>${escapeHtml(params.registerName)}</title>
+  <style>
+    @page { size: A4 landscape; margin: 10mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #1f2933;
+      background: #ffffff;
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+    }
+    .page {
+      width: 100%;
+      min-height: 100vh;
+      border: 2px solid #0f3d2e;
+      padding: 10mm;
+      background: #fffdf8;
+    }
+    .header {
+      display: grid;
+      grid-template-columns: 70px minmax(0, 1fr) 70px;
+      align-items: center;
+      gap: 14px;
+      border-bottom: 2px solid #d4af37;
+      padding-bottom: 8px;
+    }
+    .mark {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 62px;
+      height: 62px;
+      border: 2px solid #d4af37;
+      border-radius: 50%;
+      color: #0f3d2e;
+      font-family: Georgia, serif;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .title {
+      text-align: center;
+    }
+    .title p {
+      margin: 0;
+      color: #9d7a1e;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .title h1 {
+      margin: 4px 0 0;
+      color: #0f3d2e;
+      font-family: Georgia, serif;
+      font-size: 25px;
+      text-transform: uppercase;
+    }
+    .meta {
+      margin-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: #667085;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    table {
+      width: 100%;
+      margin-top: 10px;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    th {
+      background: #0f3d2e;
+      color: #ffffff;
+      border: 1px solid #0f3d2e;
+      padding: 6px 5px;
+      text-align: left;
+      font-size: 9px;
+      text-transform: uppercase;
+    }
+    td {
+      border: 1px solid #d8c8a2;
+      padding: 5px;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+    td span {
+      display: block;
+      margin-top: 2px;
+      color: #667085;
+      font-size: 9px;
+      font-weight: 700;
+    }
+    tr:nth-child(even) td {
+      background: #fff9ee;
+    }
+    .empty {
+      margin-top: 20px;
+      border: 1px dashed #d8c8a2;
+      padding: 18px;
+      text-align: center;
+      color: #667085;
+      font-weight: 700;
+    }
+    .signature-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18mm;
+      margin-top: 16mm;
+      padding: 0 16mm;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: #0f3d2e;
+    }
+    .signature-line {
+      border-top: 1px solid #1f2933;
+      padding-top: 6px;
+    }
+    @media print {
+      body { background: #ffffff; }
+      .page { border: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div class="mark">IHS</div>
+      <div class="title">
+        <p>Registre paroissial officiel</p>
+        <h1>${escapeHtml(params.registerName)}</h1>
+      </div>
+      <div class="mark">+</div>
+    </header>
+    <section class="meta">
+      <span>${escapeHtml(filterText)}</span>
+      <span>Genere le ${escapeHtml(generatedAt)}</span>
+    </section>
+    ${params.records.length > 0 ? `
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 4%;">No</th>
+            <th style="width: 8%;">Date</th>
+            <th style="width: 16%;">Paroissien</th>
+            <th style="width: 11%;">Type</th>
+            <th style="width: 13%;">Certificat</th>
+            <th style="width: 12%;">Lieu</th>
+            <th style="width: 12%;">Officiant</th>
+            <th style="width: 13%;">Parrain / Marraine</th>
+            <th style="width: 11%;">Notes</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    ` : '<div class="empty">Aucune entree trouvee pour ces filtres.</div>'}
+    <section class="signature-row">
+      <div class="signature-line">Secretaire paroissial</div>
+      <div class="signature-line">Cure / Responsable</div>
+      <div class="signature-line">Cachet de la paroisse</div>
+    </section>
+  </main>
+</body>
+</html>`;
+}
+
 export function RegistersPage() {
+  const printFrameRef = useRef<HTMLIFrameElement | null>(null);
   const [sacramentTypes, setSacramentTypes] = useState<SacramentType[]>([]);
   const [records, setRecords] = useState<Sacrament[]>([]);
   const [selectedTypeId, setSelectedTypeId] = useState('');
@@ -92,6 +325,8 @@ export function RegistersPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedRecord, setSelectedRecord] = useState<Sacrament | null>(null);
+  const [registerPreviewHtml, setRegisterPreviewHtml] = useState('');
+  const [isRegisterPreviewOpen, setIsRegisterPreviewOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -150,6 +385,27 @@ export function RegistersPage() {
     setEndDate('');
   };
 
+  const handleOpenRegisterPreview = () => {
+    setRegisterPreviewHtml(buildRegisterPrintDocumentHtml({
+      registerName: activeRegisterName,
+      records: filteredRecords,
+      startDate,
+      endDate,
+      searchTerm,
+    }));
+    setIsRegisterPreviewOpen(true);
+  };
+
+  const handleCloseRegisterPreview = () => {
+    setIsRegisterPreviewOpen(false);
+    setRegisterPreviewHtml('');
+  };
+
+  const handlePrintRegisterPreview = () => {
+    printFrameRef.current?.contentWindow?.focus();
+    printFrameRef.current?.contentWindow?.print();
+  };
+
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-[#D8C8A2] bg-[#FFF9EE] p-6 shadow-sm">
@@ -168,7 +424,7 @@ export function RegistersPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={handleOpenRegisterPreview}
               className="inline-flex items-center gap-2 rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]"
             >
               <CatholicIcon name="print" className="h-4 w-4" />
@@ -371,6 +627,41 @@ export function RegistersPage() {
           </table>
         </div>
       </section>
+
+      {isRegisterPreviewOpen && registerPreviewHtml && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[#D8C8A2] bg-white shadow-2xl">
+            <div className="flex items-center justify-between gap-4 border-b border-[#E5DED0] bg-[#FFF9EE] px-5 py-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Apercu impression</p>
+                <h3 className="font-serif text-xl font-bold text-[#0F3D2E]">{activeRegisterName}</h3>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handlePrintRegisterPreview}
+                  className="rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]"
+                >
+                  Imprimer
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseRegisterPreview}
+                  className="rounded-xl bg-[#0F3D2E] px-4 py-2 text-sm font-bold text-white hover:bg-[#145C43]"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+            <iframe
+              ref={printFrameRef}
+              title="Apercu impression registre"
+              srcDoc={registerPreviewHtml}
+              className="h-full w-full bg-[#EFE7D6]"
+            />
+          </div>
+        </div>
+      )}
 
       {selectedRecord && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/20" role="dialog" aria-modal="true">
