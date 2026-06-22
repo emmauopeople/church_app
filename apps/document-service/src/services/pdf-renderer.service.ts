@@ -2,6 +2,18 @@ import puppeteer, { type PDFOptions } from "puppeteer";
 
 import type { CertificateRenderOptions } from "./certificate-template.service.js";
 
+function getStandardPdfFormat(size: CertificateRenderOptions["size"]): PDFOptions["format"] {
+  if (size === "LETTER") {
+    return "letter";
+  }
+
+  if (size === "A5") {
+    return "a5";
+  }
+
+  return "a4";
+}
+
 export function getPdfOptions(renderOptions: CertificateRenderOptions): PDFOptions {
   const baseOptions: PDFOptions = {
     printBackground: true,
@@ -31,7 +43,7 @@ export function getPdfOptions(renderOptions: CertificateRenderOptions): PDFOptio
 
   return {
     ...baseOptions,
-    format: renderOptions.size === "LETTER" ? "Letter" : renderOptions.size,
+    format: getStandardPdfFormat(renderOptions.size),
     landscape: renderOptions.orientation === "landscape"
   };
 }
