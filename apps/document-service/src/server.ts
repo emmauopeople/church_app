@@ -2,9 +2,11 @@ import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
+import multipart from "@fastify/multipart";
 
 import { db } from "./config/db.js";
 import { certificateRoutes } from "./routes/certificate.routes.js";
+import { documentFileRoutes } from "./routes/document-file.routes.js";
 
 const app = Fastify({
   logger: true
@@ -21,6 +23,12 @@ async function start() {
 
   await app.register(helmet, {
     contentSecurityPolicy: false
+  });
+
+  await app.register(multipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024
+    }
   });
 
   app.get("/health", async () => {
@@ -43,6 +51,7 @@ async function start() {
   });
 
   await app.register(certificateRoutes);
+  await app.register(documentFileRoutes);
 
   try {
     await app.listen({ port: PORT, host: HOST });
