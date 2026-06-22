@@ -40,15 +40,11 @@ function getDateOnly(value?: string | null) {
 function formatDate(value?: string | null) {
   const dateOnly = getDateOnly(value);
 
-  if (!dateOnly) {
-    return '-';
-  }
+  if (!dateOnly) return '-';
 
   const [year, month, day] = dateOnly.split('-');
 
-  if (!year || !month || !day) {
-    return dateOnly;
-  }
+  if (!year || !month || !day) return dateOnly;
 
   return `${day}/${month}/${year}`;
 }
@@ -127,9 +123,7 @@ function getAge(dateOfBirth?: string | null) {
   let age = today.getFullYear() - birthDate.getFullYear();
   const monthDifference = today.getMonth() - birthDate.getMonth();
 
-  if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
-    age -= 1;
-  }
+  if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) age -= 1;
 
   return age >= 0 ? age : null;
 }
@@ -175,26 +169,10 @@ function buildFilterText(items: string[]) {
 
 function getSacramentStatistics(records: Sacrament[]): RegisterStatistic[] {
   return [
-    {
-      label: 'Bapteme',
-      color: '#0EA5E9',
-      count: records.filter((record) => record.sacramentTypeName.toLowerCase().includes('bapt')).length,
-    },
-    {
-      label: 'Confirmation',
-      color: '#7C3AED',
-      count: records.filter((record) => record.sacramentTypeName.toLowerCase().includes('confirm')).length,
-    },
-    {
-      label: 'Mariage',
-      color: '#D97706',
-      count: records.filter((record) => record.sacramentTypeName.toLowerCase().includes('mari')).length,
-    },
-    {
-      label: 'Premiere communion',
-      color: '#16A34A',
-      count: records.filter((record) => record.sacramentTypeName.toLowerCase().includes('commun')).length,
-    },
+    { label: 'Bapteme', color: '#0EA5E9', count: records.filter((record) => record.sacramentTypeName.toLowerCase().includes('bapt')).length },
+    { label: 'Confirmation', color: '#7C3AED', count: records.filter((record) => record.sacramentTypeName.toLowerCase().includes('confirm')).length },
+    { label: 'Mariage', color: '#D97706', count: records.filter((record) => record.sacramentTypeName.toLowerCase().includes('mari')).length },
+    { label: 'Premiere communion', color: '#16A34A', count: records.filter((record) => record.sacramentTypeName.toLowerCase().includes('commun')).length },
   ];
 }
 
@@ -206,7 +184,7 @@ function getChristianStatistics(members: Member[]): RegisterStatistic[] {
   }));
 }
 
-function buildStatisticsChartHtml(title: string, subtitle: string, statistics: RegisterStatistic[]) {
+function buildHorizontalStatisticsChartHtml(title: string, subtitle: string, statistics: RegisterStatistic[]) {
   const maxCount = Math.max(...statistics.map((statistic) => statistic.count), 1);
   const totalCount = statistics.reduce((sum, statistic) => sum + statistic.count, 0);
   const rows = statistics.map((statistic) => {
@@ -224,11 +202,40 @@ function buildStatisticsChartHtml(title: string, subtitle: string, statistics: R
 
   return `
     <section class="stats-section">
-      <div class="stats-header">
-        <div><p>${escapeHtml(subtitle)}</p><h2>${escapeHtml(title)}</h2></div>
-        <div class="stats-total">${totalCount} total</div>
-      </div>
+      <div class="stats-header"><div><p>${escapeHtml(subtitle)}</p><h2>${escapeHtml(title)}</h2></div><div class="stats-total">${totalCount} total</div></div>
       <div class="chart-box">${rows}</div>
+    </section>
+  `;
+}
+
+function buildVerticalStatisticsChartHtml(title: string, subtitle: string, statistics: RegisterStatistic[]) {
+  const maxCount = Math.max(...statistics.map((statistic) => statistic.count), 1);
+  const totalCount = statistics.reduce((sum, statistic) => sum + statistic.count, 0);
+  const axis75 = Math.ceil(maxCount * 0.75);
+  const axis50 = Math.ceil(maxCount * 0.5);
+  const axis25 = Math.ceil(maxCount * 0.25);
+  const bars = statistics.map((statistic) => {
+    const height = Math.max((statistic.count / maxCount) * 120, statistic.count > 0 ? 8 : 0);
+    const percentage = totalCount > 0 ? Math.round((statistic.count / totalCount) * 100) : 0;
+
+    return `
+      <div class="vertical-bar-item">
+        <div class="vertical-count">${statistic.count}<span>${percentage}%</span></div>
+        <div class="vertical-bar" style="height: ${height}px; background: ${statistic.color};"></div>
+      </div>
+    `;
+  }).join('');
+  const labels = statistics.map((statistic) => `<div class="vertical-x-label"><span style="background: ${statistic.color};"></span>${escapeHtml(statistic.label)}</div>`).join('');
+
+  return `
+    <section class="stats-section">
+      <div class="stats-header"><div><p>${escapeHtml(subtitle)}</p><h2>${escapeHtml(title)}</h2></div><div class="stats-total">${totalCount} total</div></div>
+      <div class="vertical-chart">
+        <div class="vertical-y-axis"><span>${maxCount}</span><span>${axis75}</span><span>${axis50}</span><span>${axis25}</span><span>0</span></div>
+        <div class="vertical-bars">${bars}</div>
+        <div class="vertical-axis-label">Nombre</div>
+        <div class="vertical-x-axis">${labels}</div>
+      </div>
     </section>
   `;
 }
@@ -258,6 +265,17 @@ function getPrintDocumentStyles() {
     .chart-bar { height: 100%; border-radius: 999px; }
     .chart-count { text-align: right; color: #0f3d2e; font-size: 10px; font-weight: 700; }
     .chart-count span { color: #667085; font-size: 9px; }
+    .vertical-chart { display: grid; grid-template-columns: 34px minmax(0, 1fr); grid-template-rows: 145px 30px; column-gap: 10px; margin-top: 6px; }
+    .vertical-y-axis { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; padding-right: 6px; border-right: 2px solid #0f3d2e; color: #667085; font-size: 8px; font-weight: 700; }
+    .vertical-bars { display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; gap: 12px; padding: 0 14px; border-bottom: 2px solid #0f3d2e; background: repeating-linear-gradient(to top, transparent 0, transparent 28px, rgba(216, 200, 162, 0.45) 29px); }
+    .vertical-bar-item { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 3px; }
+    .vertical-bar { width: 34px; border-radius: 8px 8px 0 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35); }
+    .vertical-count { color: #0f3d2e; font-size: 9px; font-weight: 800; line-height: 1; text-align: center; }
+    .vertical-count span { display: block; color: #667085; font-size: 7.5px; margin-top: 1px; }
+    .vertical-axis-label { display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; color: #9d7a1e; font-size: 8px; font-weight: 800; text-transform: uppercase; }
+    .vertical-x-axis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; padding: 5px 14px 0; font-size: 8px; font-weight: 700; color: #1f2933; text-align: center; }
+    .vertical-x-label { display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .vertical-x-label span { width: 7px; height: 7px; border-radius: 999px; flex: 0 0 auto; }
     table { width: 100%; margin-top: 10px; border-collapse: collapse; table-layout: fixed; }
     th { background: #0f3d2e; color: #ffffff; border: 1px solid #0f3d2e; padding: 6px 5px; text-align: left; font-size: 9px; text-transform: uppercase; }
     td { border: 1px solid #d8c8a2; padding: 5px; vertical-align: top; overflow-wrap: anywhere; }
@@ -286,7 +304,7 @@ function buildSacramentRegisterPrintHtml(params: {
     params.searchTerm.trim() ? `Recherche: ${params.searchTerm.trim()}` : '',
     `Total: ${params.records.length} entree${params.records.length > 1 ? 's' : ''}`,
   ]);
-  const statisticsHtml = params.showStatistics ? buildStatisticsChartHtml('Resume par registre', 'Statistiques des sacrements', getSacramentStatistics(params.records)) : '';
+  const statisticsHtml = params.showStatistics ? buildHorizontalStatisticsChartHtml('Resume par registre', 'Statistiques des sacrements', getSacramentStatistics(params.records)) : '';
   const rows = params.records.map((record, index) => `
     <tr>
       <td>${String(index + 1).padStart(3, '0')}</td>
@@ -320,6 +338,7 @@ function buildChristianRegisterPrintHtml(params: {
   endDate: string;
   status: MemberStatusFilter;
   searchTerm: string;
+  showStatistics: boolean;
 }) {
   const generatedAt = formatDate(new Date().toISOString());
   const filterText = buildFilterText([
@@ -331,7 +350,7 @@ function buildChristianRegisterPrintHtml(params: {
     params.searchTerm.trim() ? `Recherche: ${params.searchTerm.trim()}` : '',
     `Total: ${params.members.length} personne${params.members.length > 1 ? 's' : ''}`,
   ]);
-  const statisticsHtml = buildStatisticsChartHtml('Resume par groupe d age', 'Statistiques des chretiens', getChristianStatistics(params.members));
+  const statisticsHtml = params.showStatistics ? buildVerticalStatisticsChartHtml('Resume par groupe d age', 'Statistiques des chretiens', getChristianStatistics(params.members)) : '';
   const rows = params.members.map((member, index) => {
     const age = getAge(member.dateOfBirth);
 
@@ -492,6 +511,7 @@ export function RegistersPage() {
         endDate: christianEndDate,
         status: selectedMemberStatus,
         searchTerm: christianSearchTerm,
+        showStatistics: selectedAgeGroup === 'ALL',
       }));
       setIsRegisterPreviewOpen(true);
       return;
