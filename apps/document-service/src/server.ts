@@ -4,6 +4,7 @@ import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import multipart from "@fastify/multipart";
 
+import { ensureDocumentTables } from "./config/bootstrap.js";
 import { db } from "./config/db.js";
 import { certificateRoutes } from "./routes/certificate.routes.js";
 import { documentFileRoutes } from "./routes/document-file.routes.js";
@@ -16,6 +17,8 @@ const PORT = Number(process.env.PORT || 4003);
 const HOST = "0.0.0.0";
 
 async function start() {
+  await ensureDocumentTables();
+
   await app.register(cors, {
     origin: true,
     credentials: true
