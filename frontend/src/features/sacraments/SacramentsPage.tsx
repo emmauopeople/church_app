@@ -140,6 +140,8 @@ export function SacramentsPage() {
     });
   }, [recordSearchTerm, records]);
 
+  const displayedRecordText = `${filteredRecords.length} acte${filteredRecords.length > 1 ? 's' : ''} affiche${filteredRecords.length > 1 ? 's' : ''}`;
+
   useEffect(() => {
     if (queryMemberId) {
       setSelectedParishioner({
@@ -240,10 +242,20 @@ export function SacramentsPage() {
     }
   }, [selectedIsConfirmation]);
 
+  const clearRegisterAlert = () => {
+    setErrorMessage('');
+    setSuccessMessage('');
+  };
+
   const handleSelectParishioner = (member: Member) => {
     setSelectedParishioner(toSelectedParishioner(member));
     setEditingRecord(null);
-    setSuccessMessage('');
+    clearRegisterAlert();
+  };
+
+  const handleSelectedTypeChange = (value: string) => {
+    setSelectedTypeId(value);
+    clearRegisterAlert();
   };
 
   const handleCancelEdit = () => {
@@ -299,12 +311,12 @@ export function SacramentsPage() {
     }
 
     if (!sponsor1 || !sponsor2) {
-      setErrorMessage('Sponsor 1 et Sponsor 2 sont obligatoires. Pour la confirmation, utilisez N/A si non applicable.');
+      setErrorMessage('Parrain et Marraine sont obligatoires. Pour la confirmation, utilisez N/A si non applicable.');
       return;
     }
 
     if (!selectedIsConfirmation && (sponsor1.toLowerCase() === 'n/a' || sponsor2.toLowerCase() === 'n/a')) {
-      setErrorMessage('Pour ce sacrement, les noms des sponsors doivent etre renseignes. N/A est reserve a la confirmation.');
+      setErrorMessage('Pour ce sacrement, les noms du parrain et de la marraine doivent etre renseignes. N/A est reserve a la confirmation.');
       return;
     }
 
@@ -361,11 +373,6 @@ export function SacramentsPage() {
       ? { type: 'success' as const, message: successMessage }
       : undefined;
 
-  const clearRegisterAlert = () => {
-    setErrorMessage('');
-    setSuccessMessage('');
-  };
-
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-[#D8C8A2] bg-[#FFF9EE] p-6 shadow-sm">
@@ -402,7 +409,7 @@ export function SacramentsPage() {
           </label>
 
           <div className="mt-4 overflow-hidden rounded-xl border border-[#EEE6D6]">
-            <table className="w-full text-left text-sm">
+            <table className="w-full min-w-[620px] text-left text-sm">
               <thead className="bg-[#FFF9EE] text-xs uppercase tracking-wide text-[#9D7A1E]">
                 <tr>
                   <th className="px-3 py-3">Code</th>
@@ -417,6 +424,7 @@ export function SacramentsPage() {
                   return (
                     <tr
                       key={member.id}
+                      aria-selected={isSelected}
                       onClick={() => handleSelectParishioner(member)}
                       className={`cursor-pointer transition ${isSelected ? 'bg-[#F4E8C8]' : 'bg-white hover:bg-[#FFF9EE]'}`}
                     >
@@ -500,7 +508,7 @@ export function SacramentsPage() {
                 name="sacramentTypeId"
                 className={inputClass}
                 value={selectedTypeId}
-                onChange={(event) => setSelectedTypeId(event.target.value)}
+                onChange={(event) => handleSelectedTypeChange(event.target.value)}
                 disabled={isSaving || isLoadingTypes}
                 required
               >
@@ -530,25 +538,25 @@ export function SacramentsPage() {
               <input name="officiant" className={inputClass} defaultValue={editingRecord?.officiant ?? ''} disabled={isSaving} />
             </label>
             <label className={labelClass}>
-              <span className={labelTextClass}>Sponsor 1 / Parrain</span>
+              <span className={labelTextClass}>Parrain / Sponsor 1</span>
               <input
                 name="sponsor1Name"
                 className={inputClass}
                 value={sponsor1Name}
                 onChange={(event) => setSponsor1Name(event.target.value)}
-                placeholder={selectedIsConfirmation ? 'N/A' : 'Nom du sponsor 1'}
+                placeholder={selectedIsConfirmation ? 'N/A' : 'Nom du parrain'}
                 disabled={isSaving}
                 required
               />
             </label>
             <label className={labelClass}>
-              <span className={labelTextClass}>Sponsor 2 / Marraine</span>
+              <span className={labelTextClass}>Marraine / Sponsor 2</span>
               <input
                 name="sponsor2Name"
                 className={inputClass}
                 value={sponsor2Name}
                 onChange={(event) => setSponsor2Name(event.target.value)}
-                placeholder={selectedIsConfirmation ? 'N/A' : 'Nom du sponsor 2'}
+                placeholder={selectedIsConfirmation ? 'N/A' : 'Nom de la marraine'}
                 disabled={isSaving}
                 required
               />
@@ -565,7 +573,7 @@ export function SacramentsPage() {
           </div>
 
           <p className="mt-3 text-xs font-semibold text-[#667085]">
-            Le numero de certificat est genere automatiquement par le systeme. Sponsor 1 et Sponsor 2 sont obligatoires; pour la confirmation, utilisez N/A si non applicable.
+            Le numero de certificat est genere automatiquement par le systeme. Parrain et Marraine sont obligatoires; pour la confirmation, utilisez N/A si non applicable.
           </p>
 
           {hasDuplicateSacrament && (
@@ -591,6 +599,7 @@ export function SacramentsPage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Registres existants</p>
             <h3 className="font-serif text-2xl font-bold text-[#0F3D2E]">Actes sacramentels</h3>
+            <p className="mt-1 text-sm font-semibold text-[#667085]">{displayedRecordText}</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px] xl:w-[620px]">
             <label className="flex h-11 items-center gap-3 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4">
@@ -616,7 +625,7 @@ export function SacramentsPage() {
         </div>
 
         <div className="mt-5 overflow-hidden rounded-xl border border-[#EEE6D6]">
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="bg-[#FFF9EE] text-xs uppercase tracking-wide text-[#9D7A1E]">
               <tr>
                 <th className="px-4 py-3">Paroissien</th>
@@ -688,8 +697,8 @@ export function SacramentsPage() {
               <p><span className="font-bold text-[#9D7A1E]">Date:</span> {formatDate(selectedRecord.sacramentDate)}</p>
               <p><span className="font-bold text-[#9D7A1E]">Lieu:</span> {selectedRecord.place || '-'}</p>
               <p><span className="font-bold text-[#9D7A1E]">Officiant:</span> {selectedRecord.officiant || '-'}</p>
-              <p><span className="font-bold text-[#9D7A1E]">Sponsor 1:</span> {selectedRecord.sponsor1Name || '-'}</p>
-              <p><span className="font-bold text-[#9D7A1E]">Sponsor 2:</span> {selectedRecord.sponsor2Name || '-'}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Parrain:</span> {selectedRecord.sponsor1Name || '-'}</p>
+              <p><span className="font-bold text-[#9D7A1E]">Marraine:</span> {selectedRecord.sponsor2Name || '-'}</p>
               <p><span className="font-bold text-[#9D7A1E]">Notes:</span> {selectedRecord.notes || '-'}</p>
             </div>
 
