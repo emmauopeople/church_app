@@ -1,5 +1,10 @@
 import type { Member, MemberStatus } from './members.types';
 
+type MemberListAlert = {
+  type: 'success' | 'error';
+  message: string;
+};
+
 type MemberListProps = {
   members: Member[];
   selectedMemberId: string;
@@ -8,6 +13,8 @@ type MemberListProps = {
   total: number;
   totalPages: number;
   isLoading?: boolean;
+  alert?: MemberListAlert;
+  onDismissAlert?: () => void;
   onPageChange: (page: number) => void;
   onSelectMember: (member: Member) => void;
 };
@@ -37,6 +44,8 @@ export function MemberList({
   total,
   totalPages,
   isLoading = false,
+  alert,
+  onDismissAlert,
   onPageChange,
   onSelectMember,
 }: MemberListProps) {
@@ -57,6 +66,21 @@ export function MemberList({
           <p className="text-sm font-bold text-[#0F3D2E]">{startItem}-{endItem} sur {total}</p>
         </div>
       </div>
+
+      {alert && (
+        <div className="border-b border-[#E5DED0] bg-white px-5 py-4">
+          <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${alert.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
+            <p className="text-sm font-semibold">{alert.message}</p>
+            <button
+              type="button"
+              onClick={onDismissAlert}
+              className="self-start rounded-lg border border-current px-4 py-1.5 text-sm font-bold sm:self-auto"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="max-h-[500px] overflow-auto">
         <table className="w-full min-w-[820px] text-left text-sm">
