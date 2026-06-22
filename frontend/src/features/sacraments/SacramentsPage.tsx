@@ -248,8 +248,9 @@ export function SacramentsPage() {
 
   const handleCancelEdit = () => {
     setEditingRecord(null);
-    setSponsor1Name(selectedIsConfirmation ? 'N/A' : '');
-    setSponsor2Name(selectedIsConfirmation ? 'N/A' : '');
+    setSelectedTypeId('');
+    setSponsor1Name('');
+    setSponsor2Name('');
     setSuccessMessage('');
   };
 
@@ -343,9 +344,9 @@ export function SacramentsPage() {
 
       formElement.reset();
       setEditingRecord(null);
-      setSelectedTypeId(String(sacramentTypeId));
-      setSponsor1Name(selectedIsConfirmation ? 'N/A' : '');
-      setSponsor2Name(selectedIsConfirmation ? 'N/A' : '');
+      setSelectedTypeId('');
+      setSponsor1Name('');
+      setSponsor2Name('');
       setRefreshRecordsKey((current) => current + 1);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Impossible d enregistrer le sacrement.');
