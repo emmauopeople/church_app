@@ -39,6 +39,7 @@ export type CertificateTemplateData = {
     motherName: string;
   };
   sacrament: {
+    id: string;
     typeCode: string;
     typeName: string;
     certificateNumber: string;
@@ -113,6 +114,7 @@ export async function fetchSacramentCertificateData(params: {
       motherName: withFallback(sacrament.memberMotherName)
     },
     sacrament: {
+      id: sacrament.id,
       typeCode: sacrament.sacramentTypeCode,
       typeName: sacrament.sacramentTypeName,
       certificateNumber: sacrament.certificateNumber,
