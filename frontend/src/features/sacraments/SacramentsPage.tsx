@@ -478,6 +478,19 @@ export function SacramentsPage() {
                 </button>
               )}
             </div>
+
+            {registerAlert && (
+              <div className={`mt-4 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${registerAlert.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
+                <p className="text-sm font-semibold">{registerAlert.message}</p>
+                <button
+                  type="button"
+                  onClick={clearRegisterAlert}
+                  className="self-start rounded-lg border border-current px-4 py-1.5 text-sm font-bold sm:self-auto"
+                >
+                  OK
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -601,21 +614,6 @@ export function SacramentsPage() {
             </select>
           </div>
         </div>
-
-        {registerAlert && (
-          <div className="mt-4 rounded-xl border border-[#EEE6D6] bg-white p-1">
-            <div className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${registerAlert.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
-              <p className="text-sm font-semibold">{registerAlert.message}</p>
-              <button
-                type="button"
-                onClick={clearRegisterAlert}
-                className="self-start rounded-lg border border-current px-4 py-1.5 text-sm font-bold sm:self-auto"
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        )}
 
         <div className="mt-5 overflow-hidden rounded-xl border border-[#EEE6D6]">
           <table className="w-full text-left text-sm">
