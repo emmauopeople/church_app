@@ -4,7 +4,14 @@ import { useSearchParams } from 'react-router-dom';
 import { CatholicIcon } from '../../components/decorative/CatholicIcon';
 import { listMembers } from '../members/members.api';
 import type { Member } from '../members/members.types';
-import { createSacrament, listSacraments, listSacramentTypes, updateSacrament } from './sacraments.api';
+import {
+  createSacrament,
+  downloadSacramentCertificate,
+  listSacraments,
+  listSacramentTypes,
+  previewSacramentCertificate,
+  updateSacrament,
+} from './sacraments.api';
 import type { Sacrament, SacramentType, UpdateSacramentPayload } from './sacraments.types';
 
 const inputClass = 'h-10 w-full rounded-lg border border-[#D9CFB8] bg-[#FFFDF8] px-3 text-sm outline-none focus:border-[#D4AF37]';
@@ -78,6 +85,15 @@ function formatDate(value?: string | null) {
   return value ? value.slice(0, 10) : '-';
 }
 
+function buildCertificateDownloadFileName(record: Sacrament) {
+  const safeType = record.sacramentTypeName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return `certificat-${safeType || 'sacrement'}-${record.certificateNumber}.pdf`;
+}
+
 export function SacramentsPage() {
   const [searchParams] = useSearchParams();
   const queryMemberId = searchParams.get('memberId') ?? '';
@@ -102,6 +118,9 @@ export function SacramentsPage() {
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isLoadingRecords, setIsLoadingRecords] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingCertificate, setIsGeneratingCertificate] = useState(false);
+  const [certificatePreviewUrl, setCertificatePreviewUrl] = useState('');
+  const [isCertificatePreviewOpen, setIsCertificatePreviewOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -242,6 +261,12 @@ export function SacramentsPage() {
     }
   }, [selectedIsConfirmation]);
 
+  useEffect(() => () => {
+    if (certificatePreviewUrl) {
+      URL.revokeObjectURL(certificatePreviewUrl);
+    }
+  }, [certificatePreviewUrl]);
+
   const clearRegisterAlert = () => {
     setErrorMessage('');
     setSuccessMessage('');
@@ -278,6 +303,57 @@ export function SacramentsPage() {
     window.setTimeout(() => {
       document.getElementById('sacrament-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 0);
+  };
+
+  const handleCloseCertificatePreview = () => {
+    if (certificatePreviewUrl) {
+      URL.revokeObjectURL(certificatePreviewUrl);
+    }
+
+    setCertificatePreviewUrl('');
+    setIsCertificatePreviewOpen(false);
+  };
+
+  const handlePreviewCertificate = async (record: Sacrament) => {
+    try {
+      setIsGeneratingCertificate(true);
+      clearRegisterAlert();
+
+      const pdfBlob = await previewSacramentCertificate(record.id);
+
+      if (certificatePreviewUrl) {
+        URL.revokeObjectURL(certificatePreviewUrl);
+      }
+
+      setCertificatePreviewUrl(URL.createObjectURL(pdfBlob));
+      setIsCertificatePreviewOpen(true);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Impossible de generer l apercu du certificat.');
+    } finally {
+      setIsGeneratingCertificate(false);
+    }
+  };
+
+  const handleDownloadCertificate = async (record: Sacrament) => {
+    try {
+      setIsGeneratingCertificate(true);
+      clearRegisterAlert();
+
+      const pdfBlob = await downloadSacramentCertificate(record.id);
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+
+      link.href = objectUrl;
+      link.download = buildCertificateDownloadFileName(record);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Impossible d exporter le certificat PDF.');
+    } finally {
+      setIsGeneratingCertificate(false);
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -711,15 +787,59 @@ export function SacramentsPage() {
                 >
                   Modifier
                 </button>
-                <button type="button" className="rounded-xl border border-[#D8C8A2] px-4 py-2.5 font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]">
-                  Apercu certificat
+                <button
+                  type="button"
+                  disabled={isGeneratingCertificate}
+                  onClick={() => handlePreviewCertificate(selectedRecord)}
+                  className="rounded-xl border border-[#D8C8A2] px-4 py-2.5 font-bold text-[#0F3D2E] hover:bg-[#FFF9EE] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isGeneratingCertificate ? 'Generation...' : 'Apercu certificat'}
                 </button>
               </div>
-              <button type="button" className="rounded-xl bg-[#0F3D2E] px-4 py-2.5 font-bold text-white hover:bg-[#145C43]">
+              <button
+                type="button"
+                disabled={isGeneratingCertificate}
+                onClick={() => handleDownloadCertificate(selectedRecord)}
+                className="rounded-xl bg-[#0F3D2E] px-4 py-2.5 font-bold text-white hover:bg-[#145C43] disabled:cursor-not-allowed disabled:opacity-50"
+              >
                 Exporter PDF
               </button>
             </div>
           </aside>
+        </div>
+      )}
+
+      {isCertificatePreviewOpen && certificatePreviewUrl && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[#D8C8A2] bg-white shadow-2xl">
+            <div className="flex items-center justify-between gap-4 border-b border-[#E5DED0] bg-[#FFF9EE] px-5 py-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Apercu certificat</p>
+                <h3 className="font-serif text-xl font-bold text-[#0F3D2E]">Document PDF</h3>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.open(certificatePreviewUrl, '_blank', 'noopener,noreferrer')}
+                  className="rounded-xl border border-[#D8C8A2] bg-white px-4 py-2 text-sm font-bold text-[#0F3D2E] hover:bg-[#FFF9EE]"
+                >
+                  Ouvrir
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseCertificatePreview}
+                  className="rounded-xl bg-[#0F3D2E] px-4 py-2 text-sm font-bold text-white hover:bg-[#145C43]"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+            <iframe
+              title="Apercu du certificat"
+              src={certificatePreviewUrl}
+              className="h-full w-full bg-[#EFE7D6]"
+            />
+          </div>
         </div>
       )}
     </div>
