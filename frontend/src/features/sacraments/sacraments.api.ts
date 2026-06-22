@@ -56,6 +56,24 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function parseBlobResponse(response: Response): Promise<Blob> {
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.message ?? 'Request failed');
+  }
+
+  return response.blob();
+}
+
+function buildCertificateUrl(sacramentId: string, action: 'preview' | 'download') {
+  const searchParams = new URLSearchParams({
+    size: 'A4',
+    orientation: 'landscape',
+  });
+
+  return `${config.documentApiUrl}/documents/certificates/sacraments/${sacramentId}/${action}?${searchParams.toString()}`;
+}
+
 export async function listSacramentTypes() {
   const response = await fetch(`${config.churchCoreApiUrl}/core/sacrament-types`, {
     headers: buildHeaders(),
@@ -94,4 +112,20 @@ export async function updateSacrament(sacramentId: string, payload: UpdateSacram
   });
 
   return parseResponse<SacramentWriteResponse>(response);
+}
+
+export async function previewSacramentCertificate(sacramentId: string) {
+  const response = await fetch(buildCertificateUrl(sacramentId, 'preview'), {
+    headers: buildHeaders(),
+  });
+
+  return parseBlobResponse(response);
+}
+
+export async function downloadSacramentCertificate(sacramentId: string) {
+  const response = await fetch(buildCertificateUrl(sacramentId, 'download'), {
+    headers: buildHeaders(),
+  });
+
+  return parseBlobResponse(response);
 }
