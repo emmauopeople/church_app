@@ -102,6 +102,25 @@ async function buildCertificate(params: {
   };
 }
 
+async function trackGeneratedCertificate(params: {
+  request: CertificateRequest;
+  churchId: string;
+  sacramentId: string;
+  generatedBy: string;
+  fileName: string;
+}) {
+  try {
+    await createGeneratedDocument({
+      churchId: params.churchId,
+      sacramentId: params.sacramentId,
+      generatedBy: params.generatedBy,
+      fileName: params.fileName
+    });
+  } catch (error) {
+    params.request.log.warn(error, "Certificate was generated, but tracking record was not saved");
+  }
+}
+
 export async function certificateRoutes(app: FastifyInstance) {
   app.get("/documents/certificates/sacraments/:sacramentId/html-preview", async (request: CertificateRequest, reply: FastifyReply) => {
     const authUser = requireAuth(request, reply);
@@ -152,7 +171,8 @@ export async function certificateRoutes(app: FastifyInstance) {
 
       const pdf = await renderPdfFromHtml(certificate.html, certificate.renderOptions);
 
-      await createGeneratedDocument({
+      await trackGeneratedCertificate({
+        request,
         churchId: authUser.churchId,
         sacramentId: certificate.certificateData.sacrament.id,
         generatedBy: authUser.userId,
@@ -191,7 +211,8 @@ export async function certificateRoutes(app: FastifyInstance) {
 
       const pdf = await renderPdfFromHtml(certificate.html, certificate.renderOptions);
 
-      await createGeneratedDocument({
+      await trackGeneratedCertificate({
+        request,
         churchId: authUser.churchId,
         sacramentId: certificate.certificateData.sacrament.id,
         generatedBy: authUser.userId,
