@@ -254,7 +254,7 @@ export function MembersPage() {
     : createInitialValues;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <section className="rounded-2xl border border-[#D8C8A2] bg-[#FFF9EE] p-6 shadow-sm">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex items-center gap-3">
@@ -279,22 +279,22 @@ export function MembersPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-6">
-          <div className="grid gap-3 rounded-2xl border border-[#E5DED0] bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_220px]">
-            <label className="flex h-12 items-center gap-3 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="space-y-4">
+          <div className="sticky top-0 z-20 grid gap-3 rounded-2xl border border-[#E5DED0] bg-white/95 p-4 shadow-sm backdrop-blur lg:grid-cols-[minmax(0,1fr)_220px]">
+            <label className="flex h-11 items-center gap-3 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4">
               <CatholicIcon name="search" className="h-5 w-5 text-[#9D7A1E]" />
               <input
                 value={searchTerm}
                 onChange={(event) => handleSearchChange(event.target.value)}
                 placeholder="Rechercher par nom, code, telephone, email ou ville"
-                className="h-full flex-1 bg-transparent outline-none placeholder:text-[#98A2B3]"
+                className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-[#98A2B3]"
               />
             </label>
             <select
               value={statusFilter}
               onChange={(event) => handleStatusFilterChange(event.target.value as StatusFilter)}
-              className="h-12 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4 font-semibold text-[#344054] outline-none focus:border-[#D4AF37]"
+              className="h-11 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4 text-sm font-semibold text-[#344054] outline-none focus:border-[#D4AF37]"
             >
               <option value="">Tous les statuts</option>
               <option value="ACTIVE">Actifs</option>
@@ -320,7 +320,7 @@ export function MembersPage() {
                   type="button"
                   disabled={!selectedMember}
                   onClick={() => handleAddSacrament('baptism')}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-3 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-2.5 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <CatholicIcon name="water" className="h-4 w-4" />
                   Bapteme
@@ -329,7 +329,7 @@ export function MembersPage() {
                   type="button"
                   disabled={!selectedMember}
                   onClick={() => handleAddSacrament('marriage')}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-3 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-2.5 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <CatholicIcon name="rings" className="h-4 w-4" />
                   Mariage
@@ -338,7 +338,7 @@ export function MembersPage() {
                   type="button"
                   disabled={!selectedMember}
                   onClick={() => handleAddSacrament('confirmation')}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-3 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-2.5 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <CatholicIcon name="dove" className="h-4 w-4" />
                   Confirmation
