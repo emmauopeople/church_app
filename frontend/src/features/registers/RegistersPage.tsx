@@ -6,6 +6,12 @@ import type { Sacrament, SacramentType } from '../sacraments/sacraments.types';
 
 const filterInputClass = 'h-11 rounded-xl border border-[#D9CFB8] bg-[#FFFDF8] px-4 text-sm font-semibold text-[#344054] outline-none focus:border-[#D4AF37]';
 
+type RegisterStatistic = {
+  label: string;
+  count: number;
+  color: string;
+};
+
 function getDateOnly(value?: string | null) {
   return value ? value.slice(0, 10) : '';
 }
@@ -111,12 +117,77 @@ function buildRegisterFilterText(params: {
   return filters.join(' | ');
 }
 
+function getRegisterStatistics(records: Sacrament[]): RegisterStatistic[] {
+  const baptismCount = records.filter((record) => {
+    const value = record.sacramentTypeName.toLowerCase();
+    return value.includes('bapt') || value.includes('bapteme');
+  }).length;
+
+  const confirmationCount = records.filter((record) => record.sacramentTypeName.toLowerCase().includes('confirm')).length;
+
+  const marriageCount = records.filter((record) => {
+    const value = record.sacramentTypeName.toLowerCase();
+    return value.includes('mari') || value.includes('marriage');
+  }).length;
+
+  const firstCommunionCount = records.filter((record) => {
+    const value = record.sacramentTypeName.toLowerCase();
+    return value.includes('commun') || value.includes('communion');
+  }).length;
+
+  return [
+    { label: 'Bapteme', count: baptismCount, color: '#0EA5E9' },
+    { label: 'Confirmation', count: confirmationCount, color: '#7C3AED' },
+    { label: 'Mariage', count: marriageCount, color: '#D97706' },
+    { label: 'Premiere communion', count: firstCommunionCount, color: '#16A34A' },
+  ];
+}
+
+function buildStatisticsChartHtml(records: Sacrament[]) {
+  const statistics = getRegisterStatistics(records);
+  const maxCount = Math.max(...statistics.map((statistic) => statistic.count), 1);
+  const totalCount = statistics.reduce((sum, statistic) => sum + statistic.count, 0);
+  const rows = statistics.map((statistic) => {
+    const width = Math.max((statistic.count / maxCount) * 100, statistic.count > 0 ? 8 : 0);
+    const percentage = totalCount > 0 ? Math.round((statistic.count / totalCount) * 100) : 0;
+
+    return `
+      <div class="chart-row">
+        <div class="chart-label">
+          <span class="chart-dot" style="background: ${statistic.color};"></span>
+          <strong>${escapeHtml(statistic.label)}</strong>
+        </div>
+        <div class="chart-track">
+          <div class="chart-bar" style="width: ${width}%; background: ${statistic.color};"></div>
+        </div>
+        <div class="chart-count">${statistic.count} <span>${percentage}%</span></div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <section class="stats-section">
+      <div class="stats-header">
+        <div>
+          <p>Statistiques des sacrements</p>
+          <h2>Resume par registre</h2>
+        </div>
+        <div class="stats-total">${totalCount} actes</div>
+      </div>
+      <div class="chart-box">
+        ${rows}
+      </div>
+    </section>
+  `;
+}
+
 function buildRegisterPrintDocumentHtml(params: {
   registerName: string;
   records: Sacrament[];
   startDate: string;
   endDate: string;
   searchTerm: string;
+  showStatistics: boolean;
 }) {
   const generatedAt = formatDate(new Date().toISOString());
   const filterText = buildRegisterFilterText({
@@ -126,6 +197,7 @@ function buildRegisterPrintDocumentHtml(params: {
     searchTerm: params.searchTerm,
     count: params.records.length,
   });
+  const statisticsHtml = params.showStatistics ? buildStatisticsChartHtml(params.records) : '';
 
   const rows = params.records.map((record, index) => `
     <tr>
@@ -214,6 +286,84 @@ function buildRegisterPrintDocumentHtml(params: {
       font-size: 10px;
       font-weight: 700;
     }
+    .stats-section {
+      margin-top: 10px;
+      border: 1px solid #d8c8a2;
+      background: #ffffff;
+      padding: 9px 10px;
+    }
+    .stats-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+    .stats-header p {
+      margin: 0;
+      color: #9d7a1e;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+    .stats-header h2 {
+      margin: 2px 0 0;
+      color: #0f3d2e;
+      font-family: Georgia, serif;
+      font-size: 17px;
+    }
+    .stats-total {
+      border: 1px solid #d4af37;
+      color: #0f3d2e;
+      padding: 5px 9px;
+      font-weight: 700;
+      background: #fff9ee;
+    }
+    .chart-box {
+      display: grid;
+      gap: 6px;
+    }
+    .chart-row {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr) 76px;
+      align-items: center;
+      gap: 10px;
+    }
+    .chart-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: #1f2933;
+      font-size: 10px;
+    }
+    .chart-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+    }
+    .chart-track {
+      height: 13px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #efe7d6;
+      border: 1px solid #e5ded0;
+    }
+    .chart-bar {
+      height: 100%;
+      border-radius: 999px;
+    }
+    .chart-count {
+      text-align: right;
+      color: #0f3d2e;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .chart-count span {
+      color: #667085;
+      font-size: 9px;
+    }
     table {
       width: 100%;
       margin-top: 10px;
@@ -288,6 +438,7 @@ function buildRegisterPrintDocumentHtml(params: {
       <span>${escapeHtml(filterText)}</span>
       <span>Genere le ${escapeHtml(generatedAt)}</span>
     </section>
+    ${statisticsHtml}
     ${params.records.length > 0 ? `
       <table>
         <thead>
@@ -392,6 +543,7 @@ export function RegistersPage() {
       startDate,
       endDate,
       searchTerm,
+      showStatistics: !selectedTypeId,
     }));
     setIsRegisterPreviewOpen(true);
   };
