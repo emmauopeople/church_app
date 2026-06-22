@@ -253,10 +253,21 @@ export function MembersPage() {
     ? memberToFormValues(editingMember)
     : createInitialValues;
 
+  const registerAlert = errorMessage
+    ? { type: 'error' as const, message: errorMessage }
+    : successMessage
+      ? { type: 'success' as const, message: successMessage }
+      : undefined;
+
+  const clearRegisterAlert = () => {
+    setErrorMessage('');
+    setSuccessMessage('');
+  };
+
   return (
     <div className="space-y-5">
       <section className="rounded-2xl border border-[#D8C8A2] bg-[#FFF9EE] p-6 shadow-sm">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F4E8C8] text-[#0F3D2E]">
               <CatholicIcon name="people" className="h-6 w-6" />
@@ -268,14 +279,51 @@ export function MembersPage() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={openCreateForm}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0F3D2E] px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-[#145C43]"
-          >
-            <CatholicIcon name="plus" className="h-5 w-5" />
-            Nouveau paroissien
-          </button>
+          <div className="flex flex-col gap-3 xl:items-end">
+            <button
+              type="button"
+              onClick={openCreateForm}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0F3D2E] px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-[#145C43]"
+            >
+              <CatholicIcon name="plus" className="h-5 w-5" />
+              Nouveau paroissien
+            </button>
+
+            <div className="flex flex-col gap-2 text-sm xl:items-end">
+              <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">
+                Actes sacramentels {selectedMember ? `- ${selectedMember.firstName} ${selectedMember.lastName}` : ''}
+              </p>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <button
+                  type="button"
+                  disabled={!selectedMember}
+                  onClick={() => handleAddSacrament('baptism')}
+                  className="inline-flex items-center gap-1.5 bg-transparent p-0 text-sm font-bold text-[#0F3D2E] transition hover:text-[#9D7A1E] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <CatholicIcon name="water" className="h-4 w-4" />
+                  Bapteme
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedMember}
+                  onClick={() => handleAddSacrament('marriage')}
+                  className="inline-flex items-center gap-1.5 bg-transparent p-0 text-sm font-bold text-[#0F3D2E] transition hover:text-[#9D7A1E] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <CatholicIcon name="rings" className="h-4 w-4" />
+                  Mariage
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedMember}
+                  onClick={() => handleAddSacrament('confirmation')}
+                  className="inline-flex items-center gap-1.5 bg-transparent p-0 text-sm font-bold text-[#0F3D2E] transition hover:text-[#9D7A1E] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <CatholicIcon name="dove" className="h-4 w-4" />
+                  Confirmation
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -303,62 +351,6 @@ export function MembersPage() {
             </select>
           </div>
 
-          <div className="rounded-2xl border border-[#E5DED0] bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-[#9D7A1E]">Dossier sacramentel</p>
-                <h3 className="font-serif text-xl font-bold text-[#0F3D2E]">
-                  {selectedMember ? `${selectedMember.firstName} ${selectedMember.lastName}` : 'Aucun paroissien selectionne'}
-                </h3>
-                <p className="text-sm text-[#667085]">
-                  {selectedMember ? 'Ouvrir un acte sacramentel pour ce paroissien.' : 'Selectionnez un paroissien dans la liste avant de creer un acte.'}
-                </p>
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[420px]">
-                <button
-                  type="button"
-                  disabled={!selectedMember}
-                  onClick={() => handleAddSacrament('baptism')}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-2.5 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <CatholicIcon name="water" className="h-4 w-4" />
-                  Bapteme
-                </button>
-                <button
-                  type="button"
-                  disabled={!selectedMember}
-                  onClick={() => handleAddSacrament('marriage')}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-2.5 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <CatholicIcon name="rings" className="h-4 w-4" />
-                  Mariage
-                </button>
-                <button
-                  type="button"
-                  disabled={!selectedMember}
-                  onClick={() => handleAddSacrament('confirmation')}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D8C8A2] bg-[#FFF9EE] px-4 py-2.5 text-sm font-bold text-[#0F3D2E] transition hover:bg-[#F4E8C8] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <CatholicIcon name="dove" className="h-4 w-4" />
-                  Confirmation
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {errorMessage && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-              {errorMessage}
-            </div>
-          )}
-
-          {successMessage && (
-            <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-700">
-              {successMessage}
-            </div>
-          )}
-
           {formMode && (
             <MemberForm
               key={`${formMode}-${editingMember?.id ?? formInitialValues?.memberCode ?? 'new'}`}
@@ -378,6 +370,8 @@ export function MembersPage() {
             total={pagination.total}
             totalPages={pagination.totalPages}
             isLoading={isLoading}
+            alert={registerAlert}
+            onDismissAlert={clearRegisterAlert}
             onPageChange={setPage}
             onSelectMember={setSelectedMember}
           />
