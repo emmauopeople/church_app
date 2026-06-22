@@ -17,11 +17,12 @@ function getStandardPdfFormat(size: CertificateRenderOptions["size"]): PDFOption
 export function getPdfOptions(renderOptions: CertificateRenderOptions): PDFOptions {
   const baseOptions: PDFOptions = {
     printBackground: true,
+    preferCSSPageSize: true,
     margin: {
-      top: "10mm",
-      right: "10mm",
-      bottom: "10mm",
-      left: "10mm"
+      top: "0",
+      right: "0",
+      bottom: "0",
+      left: "0"
     }
   };
 
