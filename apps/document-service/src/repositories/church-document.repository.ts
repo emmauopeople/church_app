@@ -1,3 +1,4 @@
+import { ensureDocumentTables } from "../config/bootstrap.js";
 import { db } from "../config/db.js";
 
 export type ChurchDocument = {
@@ -18,6 +19,13 @@ export type ChurchDocument = {
 
 export type ChurchDocumentSummary = Omit<ChurchDocument, "file_content" | "total_count">;
 
+let tableReadyPromise: Promise<void> | null = null;
+
+async function ensureReady() {
+  tableReadyPromise ??= ensureDocumentTables();
+  await tableReadyPromise;
+}
+
 export async function createChurchDocument(params: {
   churchId: string;
   title: string;
@@ -29,6 +37,8 @@ export async function createChurchDocument(params: {
   fileContent: Buffer;
   uploadedBy: string;
 }): Promise<ChurchDocumentSummary> {
+  await ensureReady();
+
   const result = await db.query<ChurchDocumentSummary>(
     `
       INSERT INTO church_documents (
@@ -79,6 +89,8 @@ export async function listChurchDocuments(params: {
   limit: number;
   offset: number;
 }): Promise<{ documents: ChurchDocumentSummary[]; total: number }> {
+  await ensureReady();
+
   const values: Array<string | number> = [params.churchId];
   const conditions = ["church_id = $1"];
 
@@ -135,6 +147,8 @@ export async function findChurchDocumentById(params: {
   churchId: string;
   documentId: string;
 }): Promise<ChurchDocument | null> {
+  await ensureReady();
+
   const result = await db.query<ChurchDocument>(
     `
       SELECT
