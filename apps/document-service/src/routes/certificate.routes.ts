@@ -154,7 +154,7 @@ export async function certificateRoutes(app: FastifyInstance) {
 
       await createGeneratedDocument({
         churchId: authUser.churchId,
-        sacramentId: certificate.certificateData.sacrament.certificateNumber,
+        sacramentId: certificate.certificateData.sacrament.id,
         generatedBy: authUser.userId,
         fileName: certificate.fileName
       });
@@ -193,7 +193,7 @@ export async function certificateRoutes(app: FastifyInstance) {
 
       await createGeneratedDocument({
         churchId: authUser.churchId,
-        sacramentId: certificate.certificateData.sacrament.certificateNumber,
+        sacramentId: certificate.certificateData.sacrament.id,
         generatedBy: authUser.userId,
         fileName: certificate.fileName
       });
