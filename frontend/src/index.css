@@ -36,3 +36,14 @@ select {
 button {
   cursor: pointer;
 }
+
+main div:has(> table) {
+  max-height: 32rem;
+  overflow: auto;
+}
+
+main table thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
