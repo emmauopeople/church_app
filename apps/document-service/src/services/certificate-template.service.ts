@@ -148,6 +148,33 @@ const certificateTemplate = `<!DOCTYPE html>
       justify-content: flex-start;
     }
 
+    .brand-header {
+      display: grid;
+      grid-template-columns: 62px minmax(0, 1fr) 62px;
+      align-items: center;
+      gap: 12px;
+      min-height: 62px;
+    }
+
+    .brand-mark {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 62px;
+      height: 62px;
+    }
+
+    .brand-mark img {
+      width: 58px;
+      height: 58px;
+      object-fit: contain;
+      display: block;
+    }
+
+    .seal-mark img {
+      opacity: 0.94;
+    }
+
     .header {
       text-align: center;
       text-transform: uppercase;
@@ -156,35 +183,35 @@ const certificateTemplate = `<!DOCTYPE html>
 
     .diocese {
       color: #9d7a1e;
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 700;
     }
 
     .church-name {
-      margin-top: 3px;
+      margin-top: 2px;
       color: #0f3d2e;
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 700;
     }
 
     .church-address {
-      margin-top: 3px;
+      margin-top: 2px;
       color: #667085;
-      font-size: 10.5px;
+      font-size: 10px;
       font-family: Arial, sans-serif;
       text-transform: none;
       letter-spacing: 0;
     }
 
     .title-block {
-      margin-top: 5.5mm;
+      margin-top: 4.5mm;
       text-align: center;
     }
 
     .document-title {
       margin: 0;
       color: #0f3d2e;
-      font-size: 32px;
+      font-size: 31px;
       line-height: 1.05;
       text-transform: uppercase;
       letter-spacing: 2px;
@@ -205,7 +232,7 @@ const certificateTemplate = `<!DOCTYPE html>
 
     .body-text {
       max-width: 850px;
-      margin: 6mm auto 0;
+      margin: 5.5mm auto 0;
       text-align: center;
       font-size: 17px;
       line-height: 1.55;
@@ -227,7 +254,7 @@ const certificateTemplate = `<!DOCTYPE html>
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 4.5px 15px;
       max-width: 860px;
-      margin: 5.5mm auto 0;
+      margin: 5mm auto 0;
       text-align: left;
       font-size: 12px;
       font-family: Arial, sans-serif;
@@ -259,7 +286,7 @@ const certificateTemplate = `<!DOCTYPE html>
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 13mm;
-      margin-top: 12mm;
+      margin-top: 11mm;
       padding: 0 10mm;
       text-align: center;
       font-family: Arial, sans-serif;
@@ -277,7 +304,7 @@ const certificateTemplate = `<!DOCTYPE html>
       display: flex;
       justify-content: space-between;
       gap: 12px;
-      margin-top: 4mm;
+      margin-top: 3.5mm;
       color: #667085;
       font-family: Arial, sans-serif;
       font-size: 9px;
@@ -294,10 +321,14 @@ const certificateTemplate = `<!DOCTYPE html>
     <section class="certificate-shell">
       <div class="content">
         <div>
-          <header class="header">
-            <div class="diocese">{{church.diocese}}</div>
-            <div class="church-name">{{church.name}}</div>
-            <div class="church-address">{{church.address}} {{#if church.phone}} | Tel: {{church.phone}}{{/if}} {{#if church.email}} | {{church.email}}{{/if}}</div>
+          <header class="brand-header">
+            <div class="brand-mark"><img src="{{{church.logoDataUri}}}" alt="Logo paroissial" /></div>
+            <div class="header">
+              <div class="diocese">{{church.diocese}}</div>
+              <div class="church-name">{{church.name}}</div>
+              <div class="church-address">{{church.address}}{{#if church.phone}} | Tel: {{church.phone}}{{/if}}{{#if church.email}} | {{church.email}}{{/if}}</div>
+            </div>
+            <div class="brand-mark seal-mark"><img src="{{{church.sealDataUri}}}" alt="Cachet paroissial" /></div>
           </header>
 
           <section class="title-block">
