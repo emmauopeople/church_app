@@ -3,219 +3,210 @@ import { z } from "zod";
 
 import { requireAuth } from "../middlewares/auth.js";
 import { createGeneratedDocument } from "../repositories/generated-document.repository.js";
+import { fetchSacramentCertificateData } from "../services/certificate-data.service.js";
+import {
+  buildCertificateFileName,
+  normalizeCertificateRenderOptions,
+  renderSacramentCertificateHtml,
+  type CertificateOrientation,
+  type CertificatePageSize
+} from "../services/certificate-template.service.js";
+import { renderPdfFromHtml } from "../services/pdf-renderer.service.js";
 
-const sacramentCertificateSchema = z.object({
-  sacramentId: z.string().uuid(),
-  certificateNumber: z.string().min(2),
-  sacramentTypeName: z.string().min(2),
-  sacramentDate: z.string().min(10),
-  place: z.string().optional().nullable(),
-  officiant: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
-  memberCode: z.string().optional().nullable(),
-  memberFirstName: z.string().min(1),
-  memberLastName: z.string().min(1)
+const certificateParamsSchema = z.object({
+  sacramentId: z.string().uuid()
 });
 
-function escapeHtml(value: string | null | undefined): string {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+const certificateQuerySchema = z.object({
+  size: z.enum(["A4", "LETTER", "A5", "HALF_LETTER", "CUSTOM"]).default("A4"),
+  orientation: z.enum(["portrait", "landscape"]).default("landscape"),
+  width: z.string().optional(),
+  height: z.string().optional()
+});
+
+type CertificateRequest = FastifyRequest<{
+  Params: {
+    sacramentId: string;
+  };
+  Querystring: {
+    size?: CertificatePageSize;
+    orientation?: CertificateOrientation;
+    width?: string;
+    height?: string;
+  };
+}>;
+
+function getAuthorizationHeader(request: FastifyRequest) {
+  return request.headers.authorization ?? "";
 }
 
-function formatDate(value: string): string {
-  const dateOnly = value.split("T")[0];
-  const [year, month, day] = dateOnly.split("-");
+function parseCertificateRequest(request: CertificateRequest, reply: FastifyReply) {
+  const paramsParsed = certificateParamsSchema.safeParse(request.params);
 
-  if (!year || !month || !day) {
-    return value;
+  if (!paramsParsed.success) {
+    reply.status(400).send({
+      message: "Invalid sacrament id",
+      errors: paramsParsed.error.flatten().fieldErrors
+    });
+    return null;
   }
 
-  return new Date(
-    Number(year),
-    Number(month) - 1,
-    Number(day)
-  ).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric"
-  });
+  const queryParsed = certificateQuerySchema.safeParse(request.query);
+
+  if (!queryParsed.success) {
+    reply.status(400).send({
+      message: "Invalid certificate options",
+      errors: queryParsed.error.flatten().fieldErrors
+    });
+    return null;
+  }
+
+  if (queryParsed.data.size === "CUSTOM" && (!queryParsed.data.width || !queryParsed.data.height)) {
+    reply.status(400).send({
+      message: "Custom certificate size requires width and height"
+    });
+    return null;
+  }
+
+  return {
+    sacramentId: paramsParsed.data.sacramentId,
+    renderOptions: normalizeCertificateRenderOptions(queryParsed.data)
+  };
 }
 
-function buildSacramentCertificateHtml(data: z.infer<typeof sacramentCertificateSchema>): string {
-  const fullName = `${data.memberFirstName} ${data.memberLastName}`;
-  const title = `${data.sacramentTypeName} Certificate`;
+async function buildCertificate(params: {
+  request: CertificateRequest;
+  reply: FastifyReply;
+  generatedBy: string;
+}) {
+  const parsed = parseCertificateRequest(params.request, params.reply);
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <title>${escapeHtml(title)}</title>
-  <style>
-    body {
-      font-family: Georgia, "Times New Roman", serif;
-      background: #f3f0e8;
-      padding: 40px;
-      color: #1f2933;
-    }
+  if (!parsed) {
+    return null;
+  }
 
-    .certificate {
-      max-width: 900px;
-      margin: 0 auto;
-      background: #ffffff;
-      border: 10px solid #8b6f3e;
-      padding: 48px;
-      text-align: center;
-    }
+  const certificateData = await fetchSacramentCertificateData({
+    sacramentId: parsed.sacramentId,
+    authorizationHeader: getAuthorizationHeader(params.request),
+    generatedBy: params.generatedBy
+  });
 
-    .church-name {
-      font-size: 28px;
-      font-weight: bold;
-      margin-bottom: 12px;
-      text-transform: uppercase;
-    }
+  const html = renderSacramentCertificateHtml(certificateData, parsed.renderOptions);
+  const fileName = buildCertificateFileName(certificateData);
 
-    .certificate-title {
-      font-size: 36px;
-      font-weight: bold;
-      margin: 28px 0;
-      color: #6b4f1d;
-    }
-
-    .statement {
-      font-size: 20px;
-      line-height: 1.7;
-      margin: 24px 0;
-    }
-
-    .person-name {
-      font-size: 32px;
-      font-weight: bold;
-      margin: 24px 0;
-      border-bottom: 2px solid #8b6f3e;
-      display: inline-block;
-      padding: 0 40px 8px;
-    }
-
-    .details {
-      margin-top: 30px;
-      font-size: 17px;
-      line-height: 1.8;
-      text-align: left;
-      display: inline-block;
-    }
-
-    .signature-row {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 70px;
-      gap: 40px;
-    }
-
-    .signature-box {
-      flex: 1;
-      border-top: 1px solid #1f2933;
-      padding-top: 10px;
-      font-size: 16px;
-    }
-
-    .certificate-number {
-      margin-top: 40px;
-      font-size: 14px;
-      color: #4b5563;
-    }
-
-    @media print {
-      body {
-        background: #ffffff;
-        padding: 0;
-      }
-
-      .certificate {
-        border: 10px solid #8b6f3e;
-        page-break-inside: avoid;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="certificate">
-    <div class="church-name">${escapeHtml(data.place || "Church Parish")}</div>
-
-    <div class="certificate-title">${escapeHtml(title)}</div>
-
-    <div class="statement">
-      This is to certify that
-    </div>
-
-    <div class="person-name">${escapeHtml(fullName)}</div>
-
-    <div class="statement">
-      has received the sacrament of <strong>${escapeHtml(data.sacramentTypeName)}</strong>.
-    </div>
-
-    <div class="details">
-      <div><strong>Date:</strong> ${escapeHtml(formatDate(data.sacramentDate))}</div>
-      <div><strong>Place:</strong> ${escapeHtml(data.place)}</div>
-      <div><strong>Officiant:</strong> ${escapeHtml(data.officiant)}</div>
-      <div><strong>Member Code:</strong> ${escapeHtml(data.memberCode)}</div>
-    </div>
-
-    <div class="signature-row">
-      <div class="signature-box">Parish Priest / Officiant</div>
-      <div class="signature-box">Church Seal / Secretary</div>
-    </div>
-
-    <div class="certificate-number">
-      Certificate Number: ${escapeHtml(data.certificateNumber)}
-    </div>
-  </div>
-</body>
-</html>`;
+  return {
+    html,
+    fileName,
+    certificateData,
+    renderOptions: parsed.renderOptions
+  };
 }
 
 export async function certificateRoutes(app: FastifyInstance) {
-  app.post("/documents/sacrament-certificates", async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get("/documents/certificates/sacraments/:sacramentId/html-preview", async (request: CertificateRequest, reply: FastifyReply) => {
     const authUser = requireAuth(request, reply);
 
     if (!authUser) {
       return;
     }
 
-    const parsed = sacramentCertificateSchema.safeParse(request.body);
+    try {
+      const certificate = await buildCertificate({
+        request,
+        reply,
+        generatedBy: authUser.userId
+      });
 
-    if (!parsed.success) {
-      return reply.status(400).send({
-        message: "Invalid certificate request",
-        errors: parsed.error.flatten().fieldErrors
+      if (!certificate) {
+        return;
+      }
+
+      return reply
+        .header("Content-Type", "text/html; charset=utf-8")
+        .send(certificate.html);
+    } catch (error) {
+      request.log.error(error);
+      return reply.status(502).send({
+        message: error instanceof Error ? error.message : "Unable to generate certificate HTML preview"
       });
     }
+  });
 
-    const html = buildSacramentCertificateHtml(parsed.data);
+  app.get("/documents/certificates/sacraments/:sacramentId/preview", async (request: CertificateRequest, reply: FastifyReply) => {
+    const authUser = requireAuth(request, reply);
 
-    const fileName = `${parsed.data.certificateNumber}.html`;
+    if (!authUser) {
+      return;
+    }
 
-    const generatedDocument = await createGeneratedDocument({
-      churchId: authUser.churchId,
-      sacramentId: parsed.data.sacramentId,
-      generatedBy: authUser.userId,
-      fileName
-    });
+    try {
+      const certificate = await buildCertificate({
+        request,
+        reply,
+        generatedBy: authUser.userId
+      });
 
-    return reply.status(201).send({
-      message: "Sacrament certificate generated successfully",
-      document: {
-        id: generatedDocument.id,
-        fileName: generatedDocument.file_name,
-        documentType: generatedDocument.document_type,
-        referenceEntityType: generatedDocument.reference_entity_type,
-        referenceEntityId: generatedDocument.reference_entity_id,
-        createdAt: generatedDocument.created_at
-      },
-      html
-    });
+      if (!certificate) {
+        return;
+      }
+
+      const pdf = await renderPdfFromHtml(certificate.html, certificate.renderOptions);
+
+      await createGeneratedDocument({
+        churchId: authUser.churchId,
+        sacramentId: certificate.certificateData.sacrament.certificateNumber,
+        generatedBy: authUser.userId,
+        fileName: certificate.fileName
+      });
+
+      return reply
+        .header("Content-Type", "application/pdf")
+        .header("Content-Disposition", `inline; filename="${certificate.fileName}"`)
+        .send(pdf);
+    } catch (error) {
+      request.log.error(error);
+      return reply.status(502).send({
+        message: error instanceof Error ? error.message : "Unable to generate certificate PDF preview"
+      });
+    }
+  });
+
+  app.get("/documents/certificates/sacraments/:sacramentId/download", async (request: CertificateRequest, reply: FastifyReply) => {
+    const authUser = requireAuth(request, reply);
+
+    if (!authUser) {
+      return;
+    }
+
+    try {
+      const certificate = await buildCertificate({
+        request,
+        reply,
+        generatedBy: authUser.userId
+      });
+
+      if (!certificate) {
+        return;
+      }
+
+      const pdf = await renderPdfFromHtml(certificate.html, certificate.renderOptions);
+
+      await createGeneratedDocument({
+        churchId: authUser.churchId,
+        sacramentId: certificate.certificateData.sacrament.certificateNumber,
+        generatedBy: authUser.userId,
+        fileName: certificate.fileName
+      });
+
+      return reply
+        .header("Content-Type", "application/pdf")
+        .header("Content-Disposition", `attachment; filename="${certificate.fileName}"`)
+        .send(pdf);
+    } catch (error) {
+      request.log.error(error);
+      return reply.status(502).send({
+        message: error instanceof Error ? error.message : "Unable to download certificate PDF"
+      });
+    }
   });
 }
