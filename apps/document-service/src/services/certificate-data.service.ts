@@ -1,3 +1,5 @@
+import { getParishDocumentSettings } from "./parish-settings.service.js";
+
 export type CoreSacramentDetail = {
   id: string;
   churchId: string;
@@ -29,6 +31,8 @@ export type CertificateTemplateData = {
     address: string;
     phone: string;
     email: string;
+    logoDataUri: string;
+    sealDataUri: string;
   };
   member: {
     fullName: string;
@@ -92,15 +96,10 @@ export async function fetchSacramentCertificateData(params: {
 
   const result = await response.json() as CoreSacramentResponse;
   const sacrament = result.data;
+  const parishSettings = await getParishDocumentSettings(sacrament.churchId);
 
   return {
-    church: {
-      name: process.env.PARISH_NAME ?? "Paroisse Catholique",
-      diocese: process.env.DIOCESE_NAME ?? "Diocese",
-      address: process.env.PARISH_ADDRESS ?? "Adresse de la paroisse",
-      phone: process.env.PARISH_PHONE ?? "",
-      email: process.env.PARISH_EMAIL ?? ""
-    },
+    church: parishSettings,
     member: {
       fullName: buildFullName([
         sacrament.memberFirstName,
@@ -119,7 +118,7 @@ export async function fetchSacramentCertificateData(params: {
       typeName: sacrament.sacramentTypeName,
       certificateNumber: sacrament.certificateNumber,
       date: sacrament.sacramentDate,
-      place: withFallback(sacrament.place, process.env.PARISH_NAME ?? "Paroisse"),
+      place: withFallback(sacrament.place, parishSettings.name),
       officiant: withFallback(sacrament.officiant),
       parrain: withFallback(sacrament.sponsor1Name),
       marraine: withFallback(sacrament.sponsor2Name),
