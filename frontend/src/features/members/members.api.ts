@@ -76,6 +76,19 @@ export async function listMembers(params: ListMembersParams = {}) {
   return parseResponse<ListMembersResponse>(response);
 }
 
+export async function listAllMembers(params: Omit<ListMembersParams, 'page' | 'limit'> = {}) {
+  const limit = 100;
+  const firstPage = await listMembers({ ...params, page: 1, limit });
+  const members = [...firstPage.data];
+
+  for (let page = 2; page <= firstPage.pagination.totalPages; page += 1) {
+    const response = await listMembers({ ...params, page, limit });
+    members.push(...response.data);
+  }
+
+  return members;
+}
+
 export async function getNextMemberCode() {
   const response = await fetch(`${config.churchCoreApiUrl}/core/members/next-code`, {
     headers: buildHeaders(),
