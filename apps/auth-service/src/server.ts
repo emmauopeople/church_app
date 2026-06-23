@@ -7,13 +7,16 @@ import { db } from "./config/db.js";
 import { registerMetrics } from "./plugins/metrics.js";
 import { authRoutes } from "./routes/auth.routes.js";
 
-const app = Fastify({
-  logger: true
-});
-
 const PORT = Number(process.env.PORT || 4001);
 const HOST = "0.0.0.0";
 const SERVICE_NAME = process.env.SERVICE_NAME || "auth-service";
+const LOG_LEVEL = process.env.LOG_LEVEL || "info";
+
+const app = Fastify({
+  logger: {
+    level: LOG_LEVEL
+  }
+});
 
 async function start() {
   await app.register(cors, {
