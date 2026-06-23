@@ -1,17 +1,7 @@
-name: Backend GHCR Images
+name: Manual Backend GHCR Images
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - release
-    paths:
-      - apps/auth-service/**
-      - apps/church-core-service/**
-      - apps/document-service/**
-      - package.json
-      - package-lock.json
-      - .github/workflows/backend-ghcr.yml
 
 permissions:
   contents: read
@@ -56,8 +46,8 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
           tags: |
-            type=ref,event=branch
             type=sha,prefix=sha-
+            type=raw,value=manual
 
       - name: Build and push image
         uses: docker/build-push-action@v6
