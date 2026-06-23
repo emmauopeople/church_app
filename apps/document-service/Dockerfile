@@ -50,6 +50,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/document-service/package*.json ./apps/document-service/
 COPY --from=builder /app/apps/document-service/dist ./apps/document-service/dist
 
+USER node
+
 EXPOSE 4003
 
 CMD ["node", "apps/document-service/dist/server.js"]
