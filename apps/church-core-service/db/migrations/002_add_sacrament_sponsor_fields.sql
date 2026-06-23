@@ -1,0 +1,3 @@
+ALTER TABLE sacraments
+  ADD COLUMN IF NOT EXISTS sponsor1_name TEXT,
+  ADD COLUMN IF NOT EXISTS sponsor2_name TEXT;
