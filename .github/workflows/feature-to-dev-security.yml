@@ -8,6 +8,10 @@ on:
       - apps/**
       - package.json
       - package-lock.json
+      - Dockerfile
+      - '**/Dockerfile'
+      - .github/workflows/**
+      - infra/**
 
 permissions:
   contents: read
@@ -41,6 +45,7 @@ jobs:
         with:
           scan-type: fs
           scan-ref: .
+          scanners: secret,config
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: 1
