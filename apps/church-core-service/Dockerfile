@@ -26,6 +26,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/church-core-service/package*.json ./apps/church-core-service/
 COPY --from=builder /app/apps/church-core-service/dist ./apps/church-core-service/dist
 
+USER node
+
 EXPOSE 4002
 
 CMD ["node", "apps/church-core-service/dist/server.js"]
