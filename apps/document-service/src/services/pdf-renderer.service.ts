@@ -58,7 +58,7 @@ export async function renderPdfFromHtml(html: string, renderOptions: Certificate
 
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html, { waitUntil: "load" });
     const pdf = await page.pdf(getPdfOptions(renderOptions));
 
     return Buffer.from(pdf);
