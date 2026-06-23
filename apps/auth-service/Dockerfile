@@ -26,6 +26,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/auth-service/package*.json ./apps/auth-service/
 COPY --from=builder /app/apps/auth-service/dist ./apps/auth-service/dist
 
+USER node
+
 EXPOSE 4001
 
 CMD ["node", "apps/auth-service/dist/server.js"]
