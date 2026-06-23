@@ -11,7 +11,9 @@ import { certificateRoutes } from "./routes/certificate.routes.js";
 import { documentFileRoutes } from "./routes/document-file.routes.js";
 
 const app = Fastify({
-  logger: true
+  logger: {
+    level: process.env.LOG_LEVEL || "info"
+  }
 });
 
 const PORT = Number(process.env.PORT || 4003);
