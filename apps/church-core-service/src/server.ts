@@ -9,13 +9,16 @@ import { memberRoutes } from "./routes/member.routes.js";
 import { sacramentRoutes } from "./routes/sacrament.routes.js";
 import { sacramentTypeRoutes } from "./routes/sacrament-type.routes.js";
 
-const app = Fastify({
-  logger: true
-});
-
 const PORT = Number(process.env.PORT || 4002);
 const HOST = "0.0.0.0";
 const SERVICE_NAME = process.env.SERVICE_NAME || "church-core-service";
+const LOG_LEVEL = process.env.LOG_LEVEL || "info";
+
+const app = Fastify({
+  logger: {
+    level: LOG_LEVEL
+  }
+});
 
 async function start() {
   await app.register(cors, {
