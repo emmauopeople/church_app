@@ -67,9 +67,9 @@ jobs:
       - name: Copy stack file to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          host: ${{ secrets.VPS_SWARM_HOST }}
+          username: ${{ secrets.VPS_SWARM_USER }}
+          key: ${{ secrets.VPS_SWARM_KEY }}
           source: infra/swarm/church-app-stack.yml
           target: /home/ubuntu/swarmapp
           strip_components: 2
@@ -77,9 +77,9 @@ jobs:
       - name: Deploy Docker Swarm stack
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          host: ${{ secrets.VPS_SWARM_HOST }}
+          username: ${{ secrets.VPS_SWARM_USER }}
+          key: ${{ secrets.VPS_SWARM_KEY }}
           script: |
             set -e
             cd /home/ubuntu/swarmapp
