@@ -4,6 +4,7 @@ import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 
 import { db } from "./config/db.js";
+import { registerMetrics } from "./plugins/metrics.js";
 import { authRoutes } from "./routes/auth.routes.js";
 
 const app = Fastify({
@@ -12,6 +13,7 @@ const app = Fastify({
 
 const PORT = Number(process.env.PORT || 4001);
 const HOST = "0.0.0.0";
+const SERVICE_NAME = process.env.SERVICE_NAME || "auth-service";
 
 async function start() {
   await app.register(cors, {
@@ -20,10 +22,11 @@ async function start() {
   });
 
   await app.register(helmet);
+  await registerMetrics(app, SERVICE_NAME);
 
   app.get("/health", async () => {
     return {
-      service: "auth-service",
+      service: SERVICE_NAME,
       status: "ok",
       timestamp: new Date().toISOString()
     };
@@ -33,7 +36,7 @@ async function start() {
     const result = await db.query("SELECT NOW() as now");
 
     return {
-      service: "auth-service",
+      service: SERVICE_NAME,
       database: "auth_db",
       status: "ok",
       time: result.rows[0].now
