@@ -6,6 +6,7 @@ import multipart from "@fastify/multipart";
 
 import { ensureDocumentTables } from "./config/bootstrap.js";
 import { db } from "./config/db.js";
+import { registerMetrics } from "./plugins/metrics.js";
 import { certificateRoutes } from "./routes/certificate.routes.js";
 import { documentFileRoutes } from "./routes/document-file.routes.js";
 
@@ -15,6 +16,7 @@ const app = Fastify({
 
 const PORT = Number(process.env.PORT || 4003);
 const HOST = "0.0.0.0";
+const SERVICE_NAME = process.env.SERVICE_NAME || "document-service";
 
 async function start() {
   await ensureDocumentTables();
@@ -28,6 +30,8 @@ async function start() {
     contentSecurityPolicy: false
   });
 
+  await registerMetrics(app, SERVICE_NAME);
+
   await app.register(multipart, {
     limits: {
       fileSize: 10 * 1024 * 1024
@@ -36,7 +40,7 @@ async function start() {
 
   app.get("/health", async () => {
     return {
-      service: "document-service",
+      service: SERVICE_NAME,
       status: "ok",
       timestamp: new Date().toISOString()
     };
@@ -46,7 +50,7 @@ async function start() {
     const result = await db.query("SELECT NOW() as now");
 
     return {
-      service: "document-service",
+      service: SERVICE_NAME,
       database: "document_core_db",
       status: "ok",
       time: result.rows[0].now
