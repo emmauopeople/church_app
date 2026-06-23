@@ -155,19 +155,143 @@ function emitRibbonAction(action: RibbonAction) {
   }));
 }
 
+function getMainButtons() {
+  return Array.from(document.querySelectorAll<HTMLButtonElement>('main button'));
+}
+
+function clickMainButtonContaining(...labels: string[]) {
+  const normalizedLabels = labels.map((label) => label.toLowerCase());
+  const button = getMainButtons().find((item) => {
+    const text = item.textContent?.toLowerCase().replace(/\s+/g, ' ').trim() ?? '';
+    return normalizedLabels.some((label) => text.includes(label.toLowerCase()));
+  });
+
+  button?.click();
+  return Boolean(button);
+}
+
+function focusMainSearchInput() {
+  const searchInput = Array.from(document.querySelectorAll<HTMLInputElement>('main input')).find((input) => {
+    const placeholder = input.placeholder.toLowerCase();
+    return placeholder.includes('rechercher') || placeholder.includes('search');
+  });
+
+  searchInput?.focus();
+  searchInput?.select();
+  return Boolean(searchInput);
+}
+
+function clickMainFileInput() {
+  const fileInput = document.querySelector<HTMLInputElement>('main input[type="file"]');
+  fileInput?.click();
+  return Boolean(fileInput);
+}
+
+function runFallbackAction(action: RibbonAction) {
+  switch (action.event) {
+    case 'members:new':
+      clickMainButtonContaining('nouveau paroissien');
+      break;
+    case 'members:search':
+    case 'sacraments:search':
+    case 'certificates:search':
+    case 'registers:search':
+    case 'documents:search':
+      focusMainSearchInput();
+      break;
+    case 'members:edit':
+      clickMainButtonContaining('modifier');
+      break;
+    case 'members:print':
+    case 'settings:print':
+      window.print();
+      break;
+    case 'members:baptism':
+      clickMainButtonContaining('bapteme');
+      break;
+    case 'members:marriage':
+      clickMainButtonContaining('mariage');
+      break;
+    case 'members:confirmation':
+      clickMainButtonContaining('confirmation');
+      break;
+    case 'sacraments:new':
+      clickMainButtonContaining('nouvel acte', 'enregistrer un acte');
+      break;
+    case 'sacraments:baptism':
+      clickMainButtonContaining('bapteme');
+      break;
+    case 'sacraments:marriage':
+      clickMainButtonContaining('mariage');
+      break;
+    case 'sacraments:confirmation':
+      clickMainButtonContaining('confirmation');
+      break;
+    case 'sacraments:preview-certificate':
+      clickMainButtonContaining('apercu certificat');
+      break;
+    case 'sacraments:download-certificate':
+      clickMainButtonContaining('exporter pdf', 'pdf');
+      break;
+    case 'certificates:create-card':
+      clickMainButtonContaining('creer / imprimer carte chretienne', 'creer carte chretienne');
+      break;
+    case 'certificates:create-certificate':
+      clickMainButtonContaining('creer certificat');
+      break;
+    case 'certificates:download':
+      clickMainButtonContaining('pdf');
+      break;
+    case 'registers:sacraments':
+      clickMainButtonContaining('registres sacramentels');
+      break;
+    case 'registers:christians':
+      clickMainButtonContaining('registre des chretiens');
+      break;
+    case 'registers:print':
+      clickMainButtonContaining('imprimer registre');
+      break;
+    case 'registers:pdf':
+      clickMainButtonContaining('exporter pdf', 'pdf');
+      break;
+    case 'documents:upload':
+      clickMainFileInput();
+      break;
+    case 'documents:preview':
+      clickMainButtonContaining('apercu');
+      break;
+    case 'documents:print':
+      clickMainButtonContaining('imprimer') || window.print();
+      break;
+    case 'documents:download':
+      clickMainButtonContaining('telecharger');
+      break;
+    case 'settings:save':
+      clickMainButtonContaining('enregistrer');
+      break;
+    default:
+      break;
+  }
+}
+
 export function Ribbon() {
   const location = useLocation();
   const navigate = useNavigate();
   const routeConfig = getRouteConfig(location.pathname);
 
   const handleAction = (action: RibbonAction) => {
+    const runAction = () => {
+      emitRibbonAction(action);
+      runFallbackAction(action);
+    };
+
     if (action.route && action.route !== location.pathname) {
       navigate(action.route);
-      window.setTimeout(() => emitRibbonAction(action), 150);
+      window.setTimeout(runAction, 200);
       return;
     }
 
-    emitRibbonAction(action);
+    runAction();
   };
 
   return (
