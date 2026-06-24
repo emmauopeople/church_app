@@ -21,6 +21,10 @@ export type CreatedUser = {
   created_at: Date;
 };
 
+export type ListedUser = CreatedUser & {
+  last_login_at: Date | null;
+};
+
 export async function findUserByEmail(email: string): Promise<AuthUser | null> {
   const result = await db.query<AuthUser>(
     `
@@ -41,6 +45,28 @@ export async function findUserByEmail(email: string): Promise<AuthUser | null> {
   );
 
   return result.rows[0] ?? null;
+}
+
+export async function listUsersByChurch(churchId: string): Promise<ListedUser[]> {
+  const result = await db.query<ListedUser>(
+    `
+      SELECT
+        id,
+        church_id,
+        full_name,
+        email,
+        role,
+        status,
+        created_at,
+        last_login_at
+      FROM users
+      WHERE church_id = $1
+      ORDER BY created_at DESC
+    `,
+    [churchId]
+  );
+
+  return result.rows;
 }
 
 export async function createUser(params: {
