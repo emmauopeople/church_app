@@ -10,13 +10,14 @@
     "forgotPassword": "Mot de passe oublie ?",
     "submit": "Connexion",
     "language": "Langue",
-    "footer": "© 2028 Diocese catholique de Ouagadougou | Support : admin@diocese.bf"
+    "footer": "(c) 2028 Diocese catholique de Ouagadougou | Support : admin@diocese.bf"
   },
   "app": {
     "title": "Gestion Paroissiale",
     "subtitle": "Bureau paroissial numerique",
     "staffName": "Secretariat",
-    "staffRole": "Personnel paroissial"
+    "staffRole": "Personnel paroissial",
+    "logout": "Deconnexion"
   },
   "nav": {
     "workspace": "Espace de travail",
@@ -40,5 +41,14 @@
     "createCertificate": "Creer certificat",
     "preview": "Apercu",
     "exportPdf": "Exporter PDF"
+  },
+  "pages": {
+    "common": {
+      "comingNext": "Cette section arrive bientot."
+    },
+    "settings": {
+      "title": "Parametres",
+      "description": "Configuration de la paroisse, des utilisateurs et des preferences."
+    }
   }
 }

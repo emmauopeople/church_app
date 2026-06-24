@@ -10,13 +10,14 @@
     "forgotPassword": "Forgot password?",
     "submit": "Login",
     "language": "Language",
-    "footer": "© 2028 Diocese of Ouagadougou | Support: admin@diocese.bf"
+    "footer": "(c) 2028 Diocese of Ouagadougou | Support: admin@diocese.bf"
   },
   "app": {
     "title": "Parish Management",
     "subtitle": "Digital parish office",
     "staffName": "Secretariat",
-    "staffRole": "Parish staff"
+    "staffRole": "Parish staff",
+    "logout": "Logout"
   },
   "nav": {
     "workspace": "Workspace",
@@ -40,5 +41,14 @@
     "createCertificate": "Create certificate",
     "preview": "Preview",
     "exportPdf": "Export PDF"
+  },
+  "pages": {
+    "common": {
+      "comingNext": "This section is coming soon."
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "Configure the parish, users, and preferences."
+    }
   }
 }
