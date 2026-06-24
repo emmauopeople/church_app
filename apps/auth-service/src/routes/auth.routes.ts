@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import { createLoginLog } from "../repositories/login-log.repository.js";
-import { createUser, findUserByEmail, updateLastLogin } from "../repositories/user.repository.js";
+import { createUser, findUserByEmail, listUsersByChurch, updateLastLogin } from "../repositories/user.repository.js";
 import { findSessionUserById } from "../repositories/user-session.repository.js";
 import { signAccessToken, verifyAccessToken } from "../utils/jwt.js";
 import { hashPassword, verifyPassword } from "../utils/password.js";
@@ -50,6 +50,57 @@ async function getActiveSessionUser(request: FastifyRequest) {
   }
 
   return user;
+}
+
+async function requireActiveAdmin(request: FastifyRequest, reply: FastifyReply) {
+  let currentUser;
+
+  try {
+    currentUser = await getActiveSessionUser(request);
+  } catch {
+    reply.status(401).send({
+      message: "Invalid or expired token"
+    });
+    return null;
+  }
+
+  if (!currentUser) {
+    reply.status(401).send({
+      message: "Authentication required"
+    });
+    return null;
+  }
+
+  if (currentUser.role !== "ADMIN") {
+    reply.status(403).send({
+      message: "Admin access required"
+    });
+    return null;
+  }
+
+  return currentUser;
+}
+
+function formatUser(user: {
+  id: string;
+  church_id: string;
+  full_name: string;
+  email: string;
+  role: "ADMIN" | "USER";
+  status: "ACTIVE" | "INACTIVE";
+  created_at?: Date;
+  last_login_at?: Date | null;
+}) {
+  return {
+    id: user.id,
+    churchId: user.church_id,
+    fullName: user.full_name,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    createdAt: user.created_at,
+    lastLoginAt: user.last_login_at
+  };
 }
 
 export async function authRoutes(app: FastifyInstance) {
@@ -172,27 +223,25 @@ export async function authRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/auth/users", async (request: FastifyRequest, reply: FastifyReply) => {
-    let currentUser;
-
-    try {
-      currentUser = await getActiveSessionUser(request);
-    } catch {
-      return reply.status(401).send({
-        message: "Invalid or expired token"
-      });
-    }
+  app.get("/auth/users", async (request: FastifyRequest, reply: FastifyReply) => {
+    const currentUser = await requireActiveAdmin(request, reply);
 
     if (!currentUser) {
-      return reply.status(401).send({
-        message: "Authentication required"
-      });
+      return;
     }
 
-    if (currentUser.role !== "ADMIN") {
-      return reply.status(403).send({
-        message: "Admin access required"
-      });
+    const users = await listUsersByChurch(currentUser.church_id);
+
+    return reply.send({
+      data: users.map(formatUser)
+    });
+  });
+
+  app.post("/auth/users", async (request: FastifyRequest, reply: FastifyReply) => {
+    const currentUser = await requireActiveAdmin(request, reply);
+
+    if (!currentUser) {
+      return;
     }
 
     const parsed = createUserSchema.safeParse(request.body);
@@ -224,15 +273,7 @@ export async function authRoutes(app: FastifyInstance) {
 
     return reply.status(201).send({
       message: "User created successfully",
-      user: {
-        id: newUser.id,
-        churchId: newUser.church_id,
-        fullName: newUser.full_name,
-        email: newUser.email,
-        role: newUser.role,
-        status: newUser.status,
-        createdAt: newUser.created_at
-      }
+      user: formatUser(newUser)
     });
   });
 }
