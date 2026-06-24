@@ -6,14 +6,17 @@ on:
       - dev
     paths:
       - apps/**
+      - frontend/**
+      - packages/**
       - package.json
       - package-lock.json
+      - .github/workflows/feature-to-dev-build.yml
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  backend-build:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -24,9 +27,31 @@ jobs:
           - document-service
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
       - run: npm ci
+
       - run: npm run build --workspace=${{ matrix.service }}
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build

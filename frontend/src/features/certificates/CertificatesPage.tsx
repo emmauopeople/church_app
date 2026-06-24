@@ -45,9 +45,7 @@ function getMemberName(member: Member) {
   return `${member.firstName} ${member.lastName}`.trim();
 }
 
-function getSacramentMemberName(record: Sacrament) {
-  return `${record.memberFirstName} ${record.memberLastName}`.trim();
-}
+
 
 function buildCertificateFileName(record: Sacrament) {
   const safeType = record.sacramentTypeName
@@ -266,7 +264,13 @@ export function CertificatesPage() {
       try {
         setIsLoadingSacraments(true);
         setMessage('');
-        const response = await listSacraments({ memberId: selectedMember.id, page: 1, limit: 100 });
+        const memberId = selectedMember?.id;
+
+if (!memberId) {
+  return;
+}
+
+const response = await listSacraments({ memberId, page: 1, limit: 100 });
         setSelectedMemberSacraments(response.data);
       } catch (error) {
         setMessage(error instanceof Error ? error.message : 'Impossible de charger les sacrements du chretien.');
