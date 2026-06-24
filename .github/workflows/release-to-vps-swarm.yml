@@ -83,12 +83,41 @@ jobs:
           target: /home/ubuntu/swarmapp
           strip_components: 2
 
+      - name: Let SSH service settle
+        run: sleep 10
+
       - name: Deploy Docker Swarm stack
+        id: deploy-swarm
+        continue-on-error: true
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_SWARM_HOST }}
           username: ${{ secrets.VPS_SWARM_USER }}
           key: ${{ secrets.VPS_SWARM_KEY }}
+          timeout: 60s
+          command_timeout: 15m
+          script: |
+            set -e
+            cd /home/ubuntu/swarmapp
+            echo "${{ secrets.GHCR_SWARM_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            export GHCR_OWNER=${{ github.repository_owner }}
+            export IMAGE_TAG=sha-${{ github.sha }}
+            docker pull ghcr.io/${{ github.repository_owner }}/church-app-auth-service:sha-${{ github.sha }}
+            docker pull ghcr.io/${{ github.repository_owner }}/church-app-church-core-service:sha-${{ github.sha }}
+            docker pull ghcr.io/${{ github.repository_owner }}/church-app-document-service:sha-${{ github.sha }}
+            docker pull ghcr.io/${{ github.repository_owner }}/church-app-frontend:sha-${{ github.sha }}
+            docker stack deploy --with-registry-auth -c church-app-stack.yml church-app
+            docker service ls --filter label=com.docker.stack.namespace=church-app
+
+      - name: Retry Docker Swarm deploy
+        if: steps.deploy-swarm.outcome == 'failure'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_SWARM_HOST }}
+          username: ${{ secrets.VPS_SWARM_USER }}
+          key: ${{ secrets.VPS_SWARM_KEY }}
+          timeout: 60s
+          command_timeout: 15m
           script: |
             set -e
             cd /home/ubuntu/swarmapp
