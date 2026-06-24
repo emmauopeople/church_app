@@ -1,6 +1,24 @@
 version: "3.8"
 
 services:
+  frontend:
+    image: ghcr.io/${GHCR_OWNER}/church-app-frontend:${IMAGE_TAG}
+    networks:
+      - church-app-net
+    ports:
+      - target: 8080
+        published: 4080
+        protocol: tcp
+        mode: ingress
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        parallelism: 1
+        failure_action: rollback
+
   auth-service:
     image: ghcr.io/${GHCR_OWNER}/church-app-auth-service:${IMAGE_TAG}
     env_file:

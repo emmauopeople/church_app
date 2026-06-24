@@ -6,8 +6,12 @@ on:
       - dev
     paths:
       - apps/**
+      - frontend/**
+      - packages/**
       - package.json
       - package-lock.json
+      - frontend/package.json
+      - frontend/package-lock.json
       - Dockerfile
       - '**/Dockerfile'
       - .github/workflows/**
@@ -20,19 +24,36 @@ permissions:
 jobs:
   npm-audit:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - name: backend-root
+            directory: .
+          - name: frontend
+            directory: frontend
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm audit --audit-level=high
+          cache-dependency-path: ${{ matrix.project.directory == '.' && 'package-lock.json' || 'frontend/package-lock.json' }}
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.project.directory }}
+        run: npm ci
+
+      - name: Run npm audit
+        working-directory: ${{ matrix.project.directory }}
+        run: npm audit --audit-level=high
 
   dependency-review:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
@@ -41,6 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs

@@ -9,6 +9,7 @@ on:
       - apps/auth-service/**
       - apps/church-core-service/**
       - apps/document-service/**
+      - frontend/**
       - infra/swarm/**
       - package.json
       - package-lock.json
@@ -35,6 +36,9 @@ jobs:
           - service: document-service
             image: church-app-document-service
             dockerfile: apps/document-service/Dockerfile
+          - service: frontend
+            image: church-app-frontend
+            dockerfile: frontend/Dockerfile
 
     steps:
       - uses: actions/checkout@v4
@@ -53,6 +57,11 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
+          build-args: |
+            VITE_AUTH_API_URL=https://api.gestionparoissiale.org
+            VITE_CHURCH_CORE_API_URL=https://api.gestionparoissiale.org
+            VITE_DOCUMENT_API_URL=https://api.gestionparoissiale.org
+            VITE_DEFAULT_LANGUAGE=fr
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:release
             ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:sha-${{ github.sha }}
@@ -89,5 +98,6 @@ jobs:
             docker pull ghcr.io/${{ github.repository_owner }}/church-app-auth-service:sha-${{ github.sha }}
             docker pull ghcr.io/${{ github.repository_owner }}/church-app-church-core-service:sha-${{ github.sha }}
             docker pull ghcr.io/${{ github.repository_owner }}/church-app-document-service:sha-${{ github.sha }}
+            docker pull ghcr.io/${{ github.repository_owner }}/church-app-frontend:sha-${{ github.sha }}
             docker stack deploy --with-registry-auth -c church-app-stack.yml church-app
             docker service ls --filter label=com.docker.stack.namespace=church-app
