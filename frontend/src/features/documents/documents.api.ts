@@ -1,4 +1,4 @@
-import { getAccessToken } from '../auth/auth.storage';
+
 import { config } from '../../lib/config';
 
 export type ChurchDocument = {
@@ -38,10 +38,16 @@ type UploadDocumentResponse = {
   data: ChurchDocument;
 };
 
-function buildAuthHeaders() {
-  const token = getAccessToken();
+function buildAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem('accessToken');
 
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (!token) {
+    return {};
+  }
+
+  return {
+    Authorization: `Bearer ${token}`,
+  };
 }
 
 function buildQuery(params: ListDocumentsParams) {
