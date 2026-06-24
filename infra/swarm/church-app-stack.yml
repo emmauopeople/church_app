@@ -6,7 +6,7 @@ services:
     networks:
       - church-app-net
     ports:
-      - target: 80
+      - target: 8080
         published: 4080
         protocol: tcp
         mode: ingress
