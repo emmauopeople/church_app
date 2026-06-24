@@ -9,11 +9,14 @@ const languages = [
   { code: 'en', label: 'EN' },
 ] as const;
 
+const languageStorageKey = 'church-app-language';
+
 export function LanguageSwitcher({ label }: LanguageSwitcherProps) {
   const { i18n, t } = useTranslation();
   const activeLanguage = i18n.language?.startsWith('en') ? 'en' : 'fr';
 
   const changeLanguage = (language: 'fr' | 'en') => {
+    window.localStorage.setItem(languageStorageKey, language);
     void i18n.changeLanguage(language);
   };
 

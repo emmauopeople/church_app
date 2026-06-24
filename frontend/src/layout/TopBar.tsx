@@ -62,7 +62,7 @@ export function TopBar() {
           onClick={handleLogout}
           className="hidden rounded-lg border border-[#D4AF37]/40 px-3 py-2 text-sm font-semibold text-[#FFF7DD] transition hover:bg-white/10 md:inline-flex"
         >
-          Deconnexion
+          {t('app.logout')}
         </button>
       </div>
     </header>
