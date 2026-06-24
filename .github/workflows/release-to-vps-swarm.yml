@@ -35,6 +35,7 @@ jobs:
             dockerfile: apps/church-core-service/Dockerfile
           - service: document-service
             image: church-app-document-service
+            dockerfile: apps/document-service/Dockerfile
           - service: frontend
             image: church-app-frontend
             dockerfile: frontend/Dockerfile
