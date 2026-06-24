@@ -1,6 +1,22 @@
 import { config } from '../../lib/config';
-import type { LoginRequest, LoginResponse, MeResponse } from './auth.types';
+import type {
+  CreateUserRequest,
+  CreateUserResponse,
+  ListUsersResponse,
+  LoginRequest,
+  LoginResponse,
+  MeResponse,
+} from './auth.types';
 import { getAccessToken } from './auth.storage';
+
+function buildJsonHeaders() {
+  const token = getAccessToken();
+
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -28,4 +44,22 @@ export async function getCurrentUser() {
   const response = await fetch(`${config.authApiUrl}/auth/me`, { headers });
 
   return parseResponse<MeResponse>(response);
+}
+
+export async function listAuthUsers() {
+  const response = await fetch(`${config.authApiUrl}/auth/users`, {
+    headers: buildJsonHeaders(),
+  });
+
+  return parseResponse<ListUsersResponse>(response);
+}
+
+export async function createAuthUser(payload: CreateUserRequest) {
+  const response = await fetch(`${config.authApiUrl}/auth/users`, {
+    method: 'POST',
+    headers: buildJsonHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<CreateUserResponse>(response);
 }
