@@ -1,5 +1,5 @@
-
 import { config } from '../../lib/config';
+import { getAccessToken } from '../auth/auth.storage';
 
 export type ChurchDocument = {
   id: string;
@@ -39,7 +39,7 @@ type UploadDocumentResponse = {
 };
 
 function buildAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('accessToken');
+  const token = getAccessToken();
 
   if (!token) {
     return {};
