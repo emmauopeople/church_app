@@ -1,7 +1,12 @@
 import { AppRouter } from './app/router';
+import { AppLanguageBridge } from './i18n/AppLanguageBridge';
 
 function App() {
-  return <AppRouter />;
+  return (
+    <AppLanguageBridge>
+      <AppRouter />
+    </AppLanguageBridge>
+  );
 }
 
 export default App;
