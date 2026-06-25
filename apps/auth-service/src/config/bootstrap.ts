@@ -1,11 +1,9 @@
 import { db } from "./db.js";
 
 export async function ensureAuthTables() {
-  await db.query("CREATE EXTENSION IF NOT EXISTS pgcrypto");
-
   await db.query(`
     CREATE TABLE IF NOT EXISTS auth_activity_logs (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      id BIGSERIAL PRIMARY KEY,
       church_id UUID,
       user_id UUID,
       email_attempted TEXT,
