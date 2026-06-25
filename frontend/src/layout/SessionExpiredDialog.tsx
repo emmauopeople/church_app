@@ -2,11 +2,40 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { clearAuthSession } from '../features/auth/auth.storage';
-import { resetSessionExpiredNotification, sessionExpiredMessage } from '../features/auth/session-expired';
+import { notifySessionExpired, resetSessionExpiredNotification, sessionExpiredMessage } from '../features/auth/session-expired';
+
+function getRequestUrl(input: RequestInfo | URL) {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
+function shouldWatchSession(url: string) {
+  return !url.includes('/auth/login') && !url.includes('/auth/logout');
+}
 
 export function SessionExpiredDialog() {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const originalFetch = window.fetch.bind(window);
+
+    window.fetch = async (input, init) => {
+      const response = await originalFetch(input, init);
+      const url = getRequestUrl(input);
+
+      if (response.status === 401 && shouldWatchSession(url)) {
+        notifySessionExpired();
+      }
+
+      return response;
+    };
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, []);
 
   useEffect(() => {
     const handleExpired = () => setIsOpen(true);
