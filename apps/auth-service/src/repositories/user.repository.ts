@@ -108,6 +108,76 @@ export async function createUser(params: {
   return result.rows[0];
 }
 
+export async function updateUserByChurch(params: {
+  userId: string;
+  churchId: string;
+  fullName: string;
+  email: string;
+  role: "ADMIN" | "USER";
+}): Promise<ListedUser | null> {
+  const result = await db.query<ListedUser>(
+    `
+      UPDATE users
+      SET
+        full_name = $3,
+        email = lower($4),
+        role = $5,
+        updated_at = NOW()
+      WHERE id = $1 AND church_id = $2
+      RETURNING
+        id,
+        church_id,
+        full_name,
+        email,
+        role,
+        status,
+        created_at,
+        last_login_at
+    `,
+    [
+      params.userId,
+      params.churchId,
+      params.fullName,
+      params.email,
+      params.role
+    ]
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function updateUserStatusByChurch(params: {
+  userId: string;
+  churchId: string;
+  status: "ACTIVE" | "INACTIVE";
+}): Promise<ListedUser | null> {
+  const result = await db.query<ListedUser>(
+    `
+      UPDATE users
+      SET
+        status = $3,
+        updated_at = NOW()
+      WHERE id = $1 AND church_id = $2
+      RETURNING
+        id,
+        church_id,
+        full_name,
+        email,
+        role,
+        status,
+        created_at,
+        last_login_at
+    `,
+    [
+      params.userId,
+      params.churchId,
+      params.status
+    ]
+  );
+
+  return result.rows[0] ?? null;
+}
+
 export async function updateLastLogin(userId: string): Promise<void> {
   await db.query(
     `

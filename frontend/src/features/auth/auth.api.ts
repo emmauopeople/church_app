@@ -6,6 +6,9 @@ import type {
   LoginRequest,
   LoginResponse,
   MeResponse,
+  UpdateUserRequest,
+  UpdateUserResponse,
+  UpdateUserStatusRequest,
 } from './auth.types';
 import { getAccessToken } from './auth.storage';
 
@@ -62,4 +65,24 @@ export async function createAuthUser(payload: CreateUserRequest) {
   });
 
   return parseResponse<CreateUserResponse>(response);
+}
+
+export async function updateAuthUser(userId: string, payload: UpdateUserRequest) {
+  const response = await fetch(`${config.authApiUrl}/auth/users/${userId}`, {
+    method: 'PATCH',
+    headers: buildJsonHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<UpdateUserResponse>(response);
+}
+
+export async function updateAuthUserStatus(userId: string, payload: UpdateUserStatusRequest) {
+  const response = await fetch(`${config.authApiUrl}/auth/users/${userId}/status`, {
+    method: 'PATCH',
+    headers: buildJsonHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse<UpdateUserResponse>(response);
 }
