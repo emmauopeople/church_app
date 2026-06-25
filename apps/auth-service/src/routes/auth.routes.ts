@@ -1,8 +1,16 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
+import { createAuthAudit, listAuthAuditLogs } from "../repositories/auth-audit.repository.js";
 import { createLoginLog } from "../repositories/login-log.repository.js";
-import { createUser, findUserByEmail, listUsersByChurch, updateLastLogin } from "../repositories/user.repository.js";
+import {
+  createUser,
+  findUserByEmail,
+  listUsersByChurch,
+  updateLastLogin,
+  updateUserByChurch,
+  updateUserStatusByChurch
+} from "../repositories/user.repository.js";
 import { findSessionUserById } from "../repositories/user-session.repository.js";
 import { signAccessToken, verifyAccessToken } from "../utils/jwt.js";
 import { hashPassword, verifyPassword } from "../utils/password.js";
@@ -18,6 +26,26 @@ const createUserSchema = z.object({
   password: z.string().min(8),
   role: z.enum(["ADMIN", "USER"]).default("USER")
 });
+
+const userParamsSchema = z.object({
+  userId: z.string().uuid()
+});
+
+const updateUserSchema = z.object({
+  fullName: z.string().min(2),
+  email: z.string().email(),
+  role: z.enum(["ADMIN", "USER"])
+});
+
+const updateUserStatusSchema = z.object({
+  status: z.enum(["ACTIVE", "INACTIVE"])
+});
+
+type UserParamsRequest = FastifyRequest<{
+  Params: {
+    userId: string;
+  };
+}>;
 
 function getBearerToken(request: FastifyRequest): string | null {
   const authorization = request.headers.authorization;
@@ -103,6 +131,32 @@ function formatUser(user: {
   };
 }
 
+function formatAuthAuditLog(log: {
+  id: string;
+  church_id: string | null;
+  user_id: string | null;
+  email_attempted: string | null;
+  action: string;
+  status: string;
+  failure_reason: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at?: Date;
+}) {
+  return {
+    id: log.id,
+    churchId: log.church_id,
+    userId: log.user_id,
+    email: log.email_attempted,
+    action: log.action,
+    status: log.status,
+    reason: log.failure_reason,
+    ipAddress: log.ip_address,
+    userAgent: log.user_agent,
+    createdAt: log.created_at
+  };
+}
+
 export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/login", async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = loginSchema.safeParse(request.body);
@@ -129,6 +183,15 @@ export async function authRoutes(app: FastifyInstance) {
         failureReason: "USER_NOT_FOUND"
       });
 
+      await createAuthAudit({
+        email,
+        action: "LOGIN",
+        status: "FAILED",
+        reason: "USER_NOT_FOUND",
+        ipAddress,
+        userAgent
+      });
+
       return reply.status(401).send({
         message: "Invalid email or password"
       });
@@ -142,6 +205,17 @@ export async function authRoutes(app: FastifyInstance) {
         userAgent,
         status: "FAILED",
         failureReason: "USER_INACTIVE"
+      });
+
+      await createAuthAudit({
+        churchId: user.church_id,
+        userId: user.id,
+        email,
+        action: "LOGIN",
+        status: "FAILED",
+        reason: "USER_INACTIVE",
+        ipAddress,
+        userAgent
       });
 
       return reply.status(403).send({
@@ -161,6 +235,17 @@ export async function authRoutes(app: FastifyInstance) {
         failureReason: "INVALID_PASSWORD"
       });
 
+      await createAuthAudit({
+        churchId: user.church_id,
+        userId: user.id,
+        email,
+        action: "LOGIN",
+        status: "FAILED",
+        reason: "INVALID_PASSWORD",
+        ipAddress,
+        userAgent
+      });
+
       return reply.status(401).send({
         message: "Invalid email or password"
       });
@@ -174,6 +259,16 @@ export async function authRoutes(app: FastifyInstance) {
       ipAddress,
       userAgent,
       status: "SUCCESS"
+    });
+
+    await createAuthAudit({
+      churchId: user.church_id,
+      userId: user.id,
+      email,
+      action: "LOGIN",
+      status: "SUCCESS",
+      ipAddress,
+      userAgent
     });
 
     const accessToken = signAccessToken({
@@ -237,6 +332,23 @@ export async function authRoutes(app: FastifyInstance) {
     });
   });
 
+  app.get("/auth/audit-logs", async (request: FastifyRequest, reply: FastifyReply) => {
+    const currentUser = await requireActiveAdmin(request, reply);
+
+    if (!currentUser) {
+      return;
+    }
+
+    const logs = await listAuthAuditLogs({
+      churchId: currentUser.church_id,
+      limit: 100
+    });
+
+    return reply.send({
+      data: logs.map(formatAuthAuditLog)
+    });
+  });
+
   app.post("/auth/users", async (request: FastifyRequest, reply: FastifyReply) => {
     const currentUser = await requireActiveAdmin(request, reply);
 
@@ -271,9 +383,141 @@ export async function authRoutes(app: FastifyInstance) {
       role: parsed.data.role
     });
 
+    await createAuthAudit({
+      churchId: currentUser.church_id,
+      userId: currentUser.id,
+      email: parsed.data.email,
+      action: "USER_CREATED",
+      status: "SUCCESS",
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"] ?? null
+    });
+
     return reply.status(201).send({
       message: "User created successfully",
       user: formatUser(newUser)
+    });
+  });
+
+  app.patch("/auth/users/:userId", async (request: UserParamsRequest, reply: FastifyReply) => {
+    const currentUser = await requireActiveAdmin(request, reply);
+
+    if (!currentUser) {
+      return;
+    }
+
+    const paramsParsed = userParamsSchema.safeParse(request.params);
+
+    if (!paramsParsed.success) {
+      return reply.status(400).send({
+        message: "Invalid user id",
+        errors: paramsParsed.error.flatten().fieldErrors
+      });
+    }
+
+    const parsed = updateUserSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      return reply.status(400).send({
+        message: "Invalid user update request",
+        errors: parsed.error.flatten().fieldErrors
+      });
+    }
+
+    const existingUser = await findUserByEmail(parsed.data.email);
+
+    if (existingUser && existingUser.id !== paramsParsed.data.userId) {
+      return reply.status(409).send({
+        message: "A user with this email already exists"
+      });
+    }
+
+    const updatedUser = await updateUserByChurch({
+      userId: paramsParsed.data.userId,
+      churchId: currentUser.church_id,
+      fullName: parsed.data.fullName,
+      email: parsed.data.email,
+      role: parsed.data.role
+    });
+
+    if (!updatedUser) {
+      return reply.status(404).send({
+        message: "User not found"
+      });
+    }
+
+    await createAuthAudit({
+      churchId: currentUser.church_id,
+      userId: currentUser.id,
+      email: parsed.data.email,
+      action: "USER_UPDATED",
+      status: "SUCCESS",
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"] ?? null
+    });
+
+    return reply.send({
+      message: "User updated successfully",
+      user: formatUser(updatedUser)
+    });
+  });
+
+  app.patch("/auth/users/:userId/status", async (request: UserParamsRequest, reply: FastifyReply) => {
+    const currentUser = await requireActiveAdmin(request, reply);
+
+    if (!currentUser) {
+      return;
+    }
+
+    const paramsParsed = userParamsSchema.safeParse(request.params);
+
+    if (!paramsParsed.success) {
+      return reply.status(400).send({
+        message: "Invalid user id",
+        errors: paramsParsed.error.flatten().fieldErrors
+      });
+    }
+
+    const parsed = updateUserStatusSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      return reply.status(400).send({
+        message: "Invalid user status request",
+        errors: parsed.error.flatten().fieldErrors
+      });
+    }
+
+    if (paramsParsed.data.userId === currentUser.id && parsed.data.status === "INACTIVE") {
+      return reply.status(400).send({
+        message: "You cannot deactivate your own account"
+      });
+    }
+
+    const updatedUser = await updateUserStatusByChurch({
+      userId: paramsParsed.data.userId,
+      churchId: currentUser.church_id,
+      status: parsed.data.status
+    });
+
+    if (!updatedUser) {
+      return reply.status(404).send({
+        message: "User not found"
+      });
+    }
+
+    await createAuthAudit({
+      churchId: currentUser.church_id,
+      userId: currentUser.id,
+      email: updatedUser.email,
+      action: parsed.data.status === "ACTIVE" ? "USER_ACTIVATED" : "USER_DEACTIVATED",
+      status: "SUCCESS",
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"] ?? null
+    });
+
+    return reply.send({
+      message: "User status updated successfully",
+      user: formatUser(updatedUser)
     });
   });
 }

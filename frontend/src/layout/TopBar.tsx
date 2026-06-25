@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChurchEmblem } from '../components/decorative/ChurchEmblem';
 import { LanguageSwitcher } from '../components/ui/LanguageSwitcher';
 import { clearAuthSession, getStoredUser } from '../features/auth/auth.storage';
+import { recordLogout } from '../features/auth/logout-client';
 
 export function TopBar() {
   const { t } = useTranslation();
@@ -25,7 +26,8 @@ export function TopBar() {
       .toUpperCase();
   }, [user?.fullName]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await recordLogout();
     clearAuthSession();
     navigate('/login');
   };
