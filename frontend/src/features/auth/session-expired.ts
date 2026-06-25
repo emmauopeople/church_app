@@ -1,6 +1,6 @@
 let notificationActive = false;
 
-export const sessionExpiredMessage = 'Votre session a expire. Cliquez sur OK pour vous reconnecter.';
+export const sessionExpiredMessage = 'Votre session a expiré. Cliquez sur OK pour vous reconnecter.';
 
 export function notifySessionExpired() {
   if (notificationActive) {
