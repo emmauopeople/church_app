@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 
 import { Ribbon } from './Ribbon';
+import { SessionExpiredDialog } from './SessionExpiredDialog';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
@@ -15,6 +16,7 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+      <SessionExpiredDialog />
     </div>
   );
 }
