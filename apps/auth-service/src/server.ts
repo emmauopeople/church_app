@@ -3,9 +3,11 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 
+import { ensureAuthTables } from "./config/bootstrap.js";
 import { db } from "./config/db.js";
 import { registerMetrics } from "./plugins/metrics.js";
 import { authRoutes } from "./routes/auth.routes.js";
+import { logoutRoutes } from "./routes/logout.routes.js";
 
 const PORT = Number(process.env.PORT || 4001);
 const HOST = "0.0.0.0";
@@ -19,6 +21,8 @@ const app = Fastify({
 });
 
 async function start() {
+  await ensureAuthTables();
+
   await app.register(cors, {
     origin: true,
     credentials: true
@@ -47,6 +51,7 @@ async function start() {
   });
 
   await app.register(authRoutes);
+  await app.register(logoutRoutes);
 
   try {
     await app.listen({ port: PORT, host: HOST });

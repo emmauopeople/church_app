@@ -1,4 +1,5 @@
 import { getAccessToken } from '../auth/auth.storage';
+import { notifySessionExpired, sessionExpiredMessage } from '../auth/session-expired';
 import { config } from '../../lib/config';
 import type { Member, MemberFormValues, MemberStatus } from './members.types';
 
@@ -61,6 +62,11 @@ function buildQuery(params: ListMembersParams) {
 
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
+    if (response.status === 401) {
+      notifySessionExpired();
+      throw new Error(sessionExpiredMessage);
+    }
+
     const errorBody = await response.json().catch(() => null);
     throw new Error(errorBody?.message ?? 'Request failed');
   }

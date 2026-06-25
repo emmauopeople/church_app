@@ -36,6 +36,21 @@ export type CreateUserResponse = {
   user: AuthUser;
 };
 
+export type UpdateUserRequest = {
+  fullName: string;
+  email: string;
+  role: 'ADMIN' | 'USER';
+};
+
+export type UpdateUserStatusRequest = {
+  status: 'ACTIVE' | 'INACTIVE';
+};
+
+export type UpdateUserResponse = {
+  message: string;
+  user: AuthUser;
+};
+
 export type ListUsersResponse = {
   data: AuthUser[];
 };
