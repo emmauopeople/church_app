@@ -7,6 +7,7 @@ import { ensureAuthTables } from "./config/bootstrap.js";
 import { db } from "./config/db.js";
 import { registerMetrics } from "./plugins/metrics.js";
 import { authRoutes } from "./routes/auth.routes.js";
+import { logoutRoutes } from "./routes/logout.routes.js";
 
 const PORT = Number(process.env.PORT || 4001);
 const HOST = "0.0.0.0";
@@ -50,6 +51,7 @@ async function start() {
   });
 
   await app.register(authRoutes);
+  await app.register(logoutRoutes);
 
   try {
     await app.listen({ port: PORT, host: HOST });
