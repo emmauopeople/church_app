@@ -17,6 +17,7 @@ import type { Sacrament, SacramentType, UpdateSacramentPayload } from './sacrame
 const inputClass = 'h-10 w-full rounded-lg border border-[#D9CFB8] bg-[#FFFDF8] px-3 text-sm outline-none focus:border-[#D4AF37]';
 const labelClass = 'space-y-1.5';
 const labelTextClass = 'text-xs font-bold uppercase tracking-wide text-[#667085]';
+const memberPageSize = 10;
 
 type SelectedParishioner = {
   id: string;
@@ -104,6 +105,11 @@ export function SacramentsPage() {
   const [sacramentTypes, setSacramentTypes] = useState<SacramentType[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  const [memberPage, setMemberPage] = useState(1);
+  const [memberPagination, setMemberPagination] = useState({
+    total: 0,
+    totalPages: 1,
+  });
   const [selectedParishioner, setSelectedParishioner] = useState<SelectedParishioner | null>(null);
   const [records, setRecords] = useState<Sacrament[]>([]);
   const [recordSearchTerm, setRecordSearchTerm] = useState('');
@@ -203,11 +209,15 @@ export function SacramentsPage() {
           const response = await listMembers({
             search: memberSearchTerm.trim() || undefined,
             status: 'ACTIVE',
-            page: 1,
-            limit: 10,
+            page: memberPage,
+            limit: memberPageSize,
           });
 
           setMembers(response.data);
+          setMemberPagination({
+            total: response.pagination.total,
+            totalPages: response.pagination.totalPages,
+          });
 
           const selectedFromList = response.data.find((member) => member.id === selectedParishioner?.id);
           if (selectedFromList) {
@@ -216,6 +226,7 @@ export function SacramentsPage() {
         } catch (error) {
           setErrorMessage(error instanceof Error ? error.message : 'Impossible de charger les paroissiens.');
           setMembers([]);
+          setMemberPagination({ total: 0, totalPages: 1 });
         } finally {
           setIsLoadingMembers(false);
         }
@@ -225,7 +236,7 @@ export function SacramentsPage() {
     }, 300);
 
     return () => window.clearTimeout(timeoutId);
-  }, [memberSearchTerm, selectedParishioner?.id]);
+  }, [memberPage, memberSearchTerm, selectedParishioner?.id]);
 
   useEffect(() => {
     async function loadRecords() {
@@ -270,6 +281,11 @@ export function SacramentsPage() {
   const clearRegisterAlert = () => {
     setErrorMessage('');
     setSuccessMessage('');
+  };
+
+  const handleMemberSearchChange = (value: string) => {
+    setMemberSearchTerm(value);
+    setMemberPage(1);
   };
 
   const handleSelectParishioner = (member: Member) => {
@@ -478,7 +494,7 @@ export function SacramentsPage() {
             <CatholicIcon name="search" className="h-5 w-5 text-[#9D7A1E]" />
             <input
               value={memberSearchTerm}
-              onChange={(event) => setMemberSearchTerm(event.target.value)}
+              onChange={(event) => handleMemberSearchChange(event.target.value)}
               placeholder="Nom, code, telephone, email ou ville"
               className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-[#98A2B3]"
             />
@@ -520,6 +536,33 @@ export function SacramentsPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#EEE6D6] bg-[#FFF9EE] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-semibold text-[#667085]">
+              Total: {memberPagination.total} paroissien{memberPagination.total > 1 ? 's' : ''}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={memberPage <= 1 || isLoadingMembers}
+                onClick={() => setMemberPage((current) => Math.max(1, current - 1))}
+                className="rounded-lg border border-[#D8C8A2] bg-white px-3 py-1.5 text-sm font-bold text-[#0F3D2E] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Precedent
+              </button>
+              <span className="text-sm font-bold text-[#0F3D2E]">
+                Page {memberPage} / {memberPagination.totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={memberPage >= memberPagination.totalPages || isLoadingMembers}
+                onClick={() => setMemberPage((current) => Math.min(memberPagination.totalPages, current + 1))}
+                className="rounded-lg border border-[#D8C8A2] bg-white px-3 py-1.5 text-sm font-bold text-[#0F3D2E] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Suivant
+              </button>
+            </div>
           </div>
         </div>
 

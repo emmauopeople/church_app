@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { CatholicIcon } from '../../components/decorative/CatholicIcon';
@@ -60,6 +60,7 @@ function createEmptyMemberFormValues(memberCode = ''): MemberFormValues {
 
 export function MembersPage() {
   const navigate = useNavigate();
+  const memberFormFocusRef = useRef<HTMLDivElement | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ACTIVE');
   const [page, setPage] = useState(1);
@@ -131,12 +132,23 @@ export function MembersPage() {
     setPage(1);
   };
 
+  const focusOpenedForm = () => {
+    window.setTimeout(() => {
+      memberFormFocusRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+      memberFormFocusRef.current?.focus({ preventScroll: true });
+    }, 0);
+  };
+
   const openCreateForm = async () => {
     setFormMode('create');
     setEditingMember(null);
     setCreateInitialValues(createEmptyMemberFormValues());
     setErrorMessage('');
     setSuccessMessage('');
+    focusOpenedForm();
 
     try {
       const response = await getNextMemberCode();
@@ -156,6 +168,7 @@ export function MembersPage() {
     setCreateInitialValues(undefined);
     setErrorMessage('');
     setSuccessMessage('');
+    focusOpenedForm();
   };
 
   const closeForm = () => {
@@ -352,14 +365,20 @@ export function MembersPage() {
           </div>
 
           {formMode && (
-            <MemberForm
-              key={`${formMode}-${editingMember?.id ?? formInitialValues?.memberCode ?? 'new'}`}
-              mode={formMode}
-              initialValues={formInitialValues}
-              isSubmitting={isSaving}
-              onCancel={closeForm}
-              onSubmit={formMode === 'edit' ? handleUpdateMember : handleCreateMember}
-            />
+            <div
+              ref={memberFormFocusRef}
+              tabIndex={-1}
+              className="scroll-mt-24 outline-none"
+            >
+              <MemberForm
+                key={`${formMode}-${editingMember?.id ?? formInitialValues?.memberCode ?? 'new'}`}
+                mode={formMode}
+                initialValues={formInitialValues}
+                isSubmitting={isSaving}
+                onCancel={closeForm}
+                onSubmit={formMode === 'edit' ? handleUpdateMember : handleCreateMember}
+              />
+            </div>
           )}
 
           <MemberList
