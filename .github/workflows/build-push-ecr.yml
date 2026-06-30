@@ -38,14 +38,14 @@ jobs:
             dockerfile: apps/church-core-service/Dockerfile
             ecr_repository: church-core-service
 
-          - name: document-core-service
-            context: apps/document-core-service
-            dockerfile: apps/document-core-service/Dockerfile
+          - name: document-service
+            context: apps/document-service
+            dockerfile: apps/document-service/Dockerfile
             ecr_repository: church-document-core-service
 
           - name: frontend
-            context: apps/frontend
-            dockerfile: apps/frontend/Dockerfile
+            context: frontend
+            dockerfile: frontend/Dockerfile
             ecr_repository: church-frontend
 
     steps:
