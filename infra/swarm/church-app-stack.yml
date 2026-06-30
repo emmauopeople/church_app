@@ -1,0 +1,85 @@
+version: "3.8"
+
+services:
+  frontend:
+    image: ghcr.io/${GHCR_OWNER}/church-app-frontend:${IMAGE_TAG}
+    networks:
+      - church-app-net
+    ports:
+      - target: 8080
+        published: 4080
+        protocol: tcp
+        mode: ingress
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        parallelism: 1
+        failure_action: rollback
+
+  auth-service:
+    image: ghcr.io/${GHCR_OWNER}/church-app-auth-service:${IMAGE_TAG}
+    env_file:
+      - /home/ubuntu/swarmapp/env/auth-service.env
+    networks:
+      - church-app-net
+    ports:
+      - target: 4001
+        published: 4001
+        protocol: tcp
+        mode: ingress
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        parallelism: 1
+        failure_action: rollback
+
+  church-core-service:
+    image: ghcr.io/${GHCR_OWNER}/church-app-church-core-service:${IMAGE_TAG}
+    env_file:
+      - /home/ubuntu/swarmapp/env/church-core-service.env
+    networks:
+      - church-app-net
+    ports:
+      - target: 4002
+        published: 4002
+        protocol: tcp
+        mode: ingress
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        parallelism: 1
+        failure_action: rollback
+
+  document-service:
+    image: ghcr.io/${GHCR_OWNER}/church-app-document-service:${IMAGE_TAG}
+    env_file:
+      - /home/ubuntu/swarmapp/env/document-service.env
+    networks:
+      - church-app-net
+    ports:
+      - target: 4003
+        published: 4003
+        protocol: tcp
+        mode: ingress
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        parallelism: 1
+        failure_action: rollback
+
+networks:
+  church-app-net:
+    driver: overlay
+    attachable: true

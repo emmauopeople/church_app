@@ -6,4 +6,7 @@ build/
 coverage/
 backups/
 *.backup
+token.sh
+*.token
+*.jwt
 

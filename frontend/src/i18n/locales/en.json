@@ -1,0 +1,54 @@
+{
+  "login": {
+    "appTitleLine1": "Parish Management",
+    "appTitleLine2": "System",
+    "diocese": "Diocese of Ouagadougou, Burkina Faso",
+    "description": "Manage parishioners, sacraments, and parish documents.",
+    "secureAccess": "Secure access for parish staff",
+    "email": "Email or username",
+    "password": "Password",
+    "forgotPassword": "Forgot password?",
+    "submit": "Login",
+    "language": "Language",
+    "footer": "(c) 2028 Diocese of Ouagadougou | Support: admin@diocese.bf"
+  },
+  "app": {
+    "title": "Parish Management",
+    "subtitle": "Digital parish office",
+    "staffName": "Secretariat",
+    "staffRole": "Parish staff",
+    "logout": "Logout"
+  },
+  "nav": {
+    "workspace": "Workspace",
+    "workspaceDescription": "Manage members, registers and certificates.",
+    "dashboard": "Dashboard",
+    "members": "Parishioners",
+    "sacraments": "Sacraments",
+    "certificates": "Certificates",
+    "registers": "Registers",
+    "documents": "Documents",
+    "settings": "Settings"
+  },
+  "ribbon": {
+    "newMember": "New member",
+    "search": "Search",
+    "save": "Save",
+    "print": "Print",
+    "newBaptism": "New record",
+    "newMarriage": "New marriage",
+    "confirmation": "Confirmation",
+    "createCertificate": "Create certificate",
+    "preview": "Preview",
+    "exportPdf": "Export PDF"
+  },
+  "pages": {
+    "common": {
+      "comingNext": "This section is coming soon."
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "Configure the parish, users, and preferences."
+    }
+  }
+}
