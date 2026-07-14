@@ -5,6 +5,15 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      frontend_api_profile:
+        description: Frontend API URL profile for the Vite build
+        required: true
+        default: local-test
+        type: choice
+        options:
+          - local-test
+          - aws-eks
 
 permissions:
   contents: read
@@ -93,6 +102,47 @@ jobs:
           echo "prod_tag=prod-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
           echo "sha_tag=sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
+      - name: Set frontend build args
+        id: frontend-build-args
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ matrix.service.name }}" != "frontend" ]; then
+            {
+              echo "build_args<<EOF"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          PROFILE="${{ github.event.inputs.frontend_api_profile || 'aws-eks' }}"
+
+          if [ "$PROFILE" = "local-test" ]; then
+            AUTH_API_URL="http://localhost:4001"
+            CHURCH_CORE_API_URL="http://localhost:4002"
+            DOCUMENT_API_URL="http://localhost:4003"
+          else
+            AUTH_API_URL="https://api.eks.gestionparoissiale.org"
+            CHURCH_CORE_API_URL="https://api.eks.gestionparoissiale.org"
+            DOCUMENT_API_URL="https://api.eks.gestionparoissiale.org"
+          fi
+
+          {
+            echo "build_args<<EOF"
+            echo "VITE_AUTH_API_URL=${AUTH_API_URL}"
+            echo "VITE_CHURCH_CORE_API_URL=${CHURCH_CORE_API_URL}"
+            echo "VITE_DOCUMENT_API_URL=${DOCUMENT_API_URL}"
+            echo "VITE_DEFAULT_LANGUAGE=fr"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Frontend API profile: ${PROFILE}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Auth API URL: ${AUTH_API_URL}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Church core API URL: ${CHURCH_CORE_API_URL}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Document API URL: ${DOCUMENT_API_URL}" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -103,6 +153,7 @@ jobs:
           file: ${{ matrix.service.dockerfile }}
           push: true
           platforms: linux/amd64
+          build-args: ${{ steps.frontend-build-args.outputs.build_args }}
           tags: |
             ${{ steps.image.outputs.repository_uri }}:${{ steps.image.outputs.prod_tag }}
             ${{ steps.image.outputs.repository_uri }}:${{ steps.image.outputs.sha_tag }}
