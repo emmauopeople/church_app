@@ -5,6 +5,25 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      frontend_api_profile:
+        description: Frontend API URL profile for the Vite build
+        required: true
+        default: local-test
+        type: choice
+        options:
+          - local-test
+          - aws-eks
+      update_gitops_tags:
+        description: Commit the new image tag to the platform GitOps repo
+        required: true
+        default: false
+        type: boolean
+      platform_branch:
+        description: Platform repo branch to update
+        required: true
+        default: feature/platform-foundation
+        type: string
 
 permissions:
   contents: read
@@ -18,6 +37,8 @@ env:
   AWS_REGION: us-east-1
   AWS_ACCOUNT_ID: "302530480617"
   AWS_ROLE_ARN: arn:aws:iam::302530480617:role/k8s-microservice-cms-github-actions
+  PLATFORM_REPOSITORY: emmauopeople/k8s-microservice-cms
+  PLATFORM_VALUES_FILE: helm/apps/church-app/values-image-tags.yaml
 
 jobs:
   build-and-push:
@@ -93,6 +114,47 @@ jobs:
           echo "prod_tag=prod-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
           echo "sha_tag=sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
+      - name: Set frontend build args
+        id: frontend-build-args
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ matrix.service.name }}" != "frontend" ]; then
+            {
+              echo "build_args<<EOF"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          PROFILE="${{ github.event.inputs.frontend_api_profile || 'aws-eks' }}"
+
+          if [ "$PROFILE" = "local-test" ]; then
+            AUTH_API_URL="http://localhost:4001"
+            CHURCH_CORE_API_URL="http://localhost:4002"
+            DOCUMENT_API_URL="http://localhost:4003"
+          else
+            AUTH_API_URL="https://api.eks.gestionparoissiale.org"
+            CHURCH_CORE_API_URL="https://api.eks.gestionparoissiale.org"
+            DOCUMENT_API_URL="https://api.eks.gestionparoissiale.org"
+          fi
+
+          {
+            echo "build_args<<EOF"
+            echo "VITE_AUTH_API_URL=${AUTH_API_URL}"
+            echo "VITE_CHURCH_CORE_API_URL=${CHURCH_CORE_API_URL}"
+            echo "VITE_DOCUMENT_API_URL=${DOCUMENT_API_URL}"
+            echo "VITE_DEFAULT_LANGUAGE=fr"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Frontend API profile: ${PROFILE}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Auth API URL: ${AUTH_API_URL}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Church core API URL: ${CHURCH_CORE_API_URL}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Document API URL: ${DOCUMENT_API_URL}" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -103,6 +165,7 @@ jobs:
           file: ${{ matrix.service.dockerfile }}
           push: true
           platforms: linux/amd64
+          build-args: ${{ steps.frontend-build-args.outputs.build_args }}
           tags: |
             ${{ steps.image.outputs.repository_uri }}:${{ steps.image.outputs.prod_tag }}
             ${{ steps.image.outputs.repository_uri }}:${{ steps.image.outputs.sha_tag }}
@@ -119,7 +182,112 @@ jobs:
           echo "- ${{ steps.image.outputs.prod_tag }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- ${{ steps.image.outputs.sha_tag }}" >> "$GITHUB_STEP_SUMMARY"
 
-# Next phase:
-# - update GitOps/Helm image tags in the platform repo
-# - let Argo CD deploy to EKS
-# - add rollout/rollback strategy after the EKS platform is ready
+  update-gitops-tags:
+    name: Update GitOps image tags
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.update_gitops_tags) }}
+
+    steps:
+      - name: Prepare GitOps update
+        id: prepare
+        shell: bash
+        env:
+          PLATFORM_REPO_TOKEN: ${{ secrets.PLATFORM_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          SHORT_SHA="${GITHUB_SHA::7}"
+          IMAGE_TAG="prod-${SHORT_SHA}"
+
+          if [ -z "${PLATFORM_REPO_TOKEN}" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+            echo "::warning::PLATFORM_REPO_TOKEN is not configured. Skipping GitOps tag update."
+            exit 0
+          fi
+
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout platform GitOps repo
+        if: steps.prepare.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PLATFORM_REPOSITORY }}
+          ref: ${{ github.event.inputs.platform_branch || 'main' }}
+          token: ${{ secrets.PLATFORM_REPO_TOKEN }}
+          path: platform-repo
+
+      - name: Update Helm image tag values
+        if: steps.prepare.outputs.enabled == 'true'
+        shell: bash
+        env:
+          IMAGE_TAG: ${{ steps.prepare.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          cd platform-repo
+
+          cat > "${PLATFORM_VALUES_FILE}" <<EOF
+          # Image tag overrides for GitOps deployments.
+          # This file is updated by the church_app GitHub Actions workflow.
+
+          services:
+            frontend:
+              image:
+                tag: ${IMAGE_TAG}
+
+            auth-service:
+              image:
+                tag: ${IMAGE_TAG}
+
+            church-core-service:
+              image:
+                tag: ${IMAGE_TAG}
+
+            document-service:
+              image:
+                tag: ${IMAGE_TAG}
+          EOF
+
+          # Remove accidental heredoc indentation from the file.
+          sed -i 's/^          //' "${PLATFORM_VALUES_FILE}"
+
+          echo "Updated ${PLATFORM_VALUES_FILE} to ${IMAGE_TAG}"
+
+      - name: Commit and push GitOps tag update
+        if: steps.prepare.outputs.enabled == 'true'
+        shell: bash
+        env:
+          IMAGE_TAG: ${{ steps.prepare.outputs.image_tag }}
+          PLATFORM_BRANCH: ${{ github.event.inputs.platform_branch || 'main' }}
+        run: |
+          set -euo pipefail
+
+          cd platform-repo
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- "${PLATFORM_VALUES_FILE}"; then
+            echo "No GitOps image tag changes to commit."
+            exit 0
+          fi
+
+          git add "${PLATFORM_VALUES_FILE}"
+          git commit -m "chore: update church app image tags to ${IMAGE_TAG}"
+          git push origin "HEAD:${PLATFORM_BRANCH}"
+
+          echo "### GitOps image tags updated" >> "$GITHUB_STEP_SUMMARY"
+          echo "Platform repo: ${PLATFORM_REPOSITORY}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Branch: ${PLATFORM_BRANCH}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Values file: ${PLATFORM_VALUES_FILE}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Image tag: ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: GitOps update skipped
+        if: steps.prepare.outputs.enabled != 'true'
+        shell: bash
+        run: |
+          echo "### GitOps image tag update skipped" >> "$GITHUB_STEP_SUMMARY"
+          echo "Add a repository secret named PLATFORM_REPO_TOKEN with write access to emmauopeople/k8s-microservice-cms to enable this step." >> "$GITHUB_STEP_SUMMARY"
