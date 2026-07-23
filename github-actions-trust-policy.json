@@ -1,0 +1,25 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::302530480617:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": [
+            "repo:emmauopeople/k8s-microservice-cms:ref:refs/heads/main",
+            "repo:emmauopeople/k8s-microservice-cms:ref:refs/heads/feature/platform-foundation",
+            "repo:emmauopeople/church_app:ref:refs/heads/main",
+            "repo:emmauopeople/church_app:ref:refs/heads/feature"
+          ]
+        }
+      }
+    }
+  ]
+}
