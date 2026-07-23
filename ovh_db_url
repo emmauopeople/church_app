@@ -1,0 +1,35 @@
+DATABASE_URL=postgresql://auth_db_user:10Patou1987*@135.125.53.186:5432/auth_db
+DATABASE_URL=postgresql://church_db_user:10Patou1987*@135.125.53.186:5432/church_core_db
+DATABASE_URL=postgresql://document_db_user:10Patou1987*@135.125.53.186:5432/document_core_db
+
+//document .env 
+
+NODE_ENV=development
+PORT=4003
+DATABASE_URL=postgresql://document_db_user:10Patou1987*@135.125.53.186:5432/document_core_db
+JWT_SECRET=change-this-secret-before-production
+CHURCH_CORE_SERVICE_URL=http://localhost:4002
+
+PARISH_NAME=Paroisse Catholique
+DIOCESE_NAME=Diocese
+PARISH_ADDRESS=Adresse de la paroisse
+PARISH_PHONE=4055511960
+PARISH_EMAIL=mbimunyui_gethub@yahoo.com
+
+// auth .env
+NODE_ENV=development
+PORT=4001
+
+DATABASE_URL=postgresql://auth_db_user:10Patou1987*@135.125.53.186:5432/auth_db
+
+JWT_SECRET=change-this-secret-before-production
+JWT_EXPIRES_IN=1h
+
+// church_core .env
+NODE_ENV=development
+PORT=4002
+
+DATABASE_URL=postgresql://church_db_user:10Patou1987*@135.125.53.186:5432/church_core_db
+
+JWT_SECRET=change-this-secret-before-production
+
